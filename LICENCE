@@ -1,0 +1,135 @@
+Business Source License 1.1
+
+License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
+“Business Source License” is a trademark of MariaDB Corporation Ab.
+
+Parameters
+
+Licensor: Invarn
+
+Licensed Work: cibuild
+
+Additional Use Grant: You may make Production Use of the Licensed Work before the Change Date only if all of the following conditions are met: (a) such use is solely for your own internal business purposes; (b) your total use of the Licensed Work does not exceed three (3) Production Instances at any time; (c) you do not offer the Licensed Work, or any substantially similar functionality, to any third party as a hosted, managed, software-as-a-service, platform-as-a-service, or other service-bureau offering; (d) you do not sublicense, resell, white-label, distribute for a fee, or otherwise commercially provide access to the Licensed Work to third parties; and (e) you do not embed, incorporate, or bundle the Licensed Work into a product or service whose primary purpose is to compete with the Licensed Work or to enable third parties to use the Licensed Work as part of a commercial offering.
+
+Change Date: 2030-03-07
+
+Change License: Apache License, Version 2.0
+
+Notice
+
+The Business Source License (this document, or the “License”) is not an Open Source license. However, the Licensed Work will eventually be made available under an Open Source license, as stated in this License.
+
+License Terms
+
+1. Grant of Rights
+
+Subject to the terms and conditions of this License, Licensor hereby grants you a limited, non-exclusive, non-transferable, non-sublicensable license to copy, modify, create derivative works of, redistribute, and use the Licensed Work.
+
+Before the Change Date, you may make Non-Production Use of the Licensed Work. You may also make Production Use of the Licensed Work only to the extent expressly permitted by the Additional Use Grant set forth in the Parameters above.
+
+Effective on the Change Date, or the fourth anniversary of the first publicly available distribution of the applicable version of the Licensed Work under this License, whichever comes first, Licensor hereby grants you rights under the terms of the Change License for that version of the Licensed Work, and the rights granted under this License for that version terminate as of that time.
+
+2. Definitions
+
+For purposes of this License:
+
+“Affiliate” means any entity that directly or indirectly controls, is controlled by, or is under common control with a party, where “control” means ownership of more than fifty percent (50%) of the voting interests or the power to direct management.
+
+“Change Date” means the date specified in the Parameters above for the Licensed Work or, where applicable, for a particular version of the Licensed Work.
+
+“Change License” means the license identified in the Parameters above.
+
+“Licensed Work” means the software identified in the Parameters above, including all source code, object code, updates, modifications, and any portions thereof made available by Licensor under this License.
+
+“Non-Production Use” means use of the Licensed Work solely for development, testing, integration, security review, academic research, proof-of-concept work, demonstration, benchmarking, staging with non-live data, or internal evaluation, and excludes Production Use except as expressly permitted by the Additional Use Grant.
+
+“Production Instance” means a single deployed running instance of the Licensed Work in a Production Use environment. Instances used solely for failover, backup, disaster recovery, development, testing, or staging with non-live data do not count as Production Instances unless they actively serve live workloads.
+
+“Production Use” means any use of the Licensed Work in a live or operational environment, including use:
+(a) to support business operations;
+(b) to process live or real-world data;
+(c) to provide services, functionality, or outputs to internal users or third parties;
+(d) in a hosted, managed, software-as-a-service, platform-as-a-service, or similar offering; or
+(e) in connection with revenue-generating activities.
+
+“You” means the individual or legal entity exercising rights under this License. If you are using the Licensed Work on behalf of an entity, then that entity is “you,” and you represent that you have authority to bind that entity to this License.
+
+3. Additional Use Grant
+
+The Additional Use Grant stated in the Parameters is part of this License and defines the scope of Production Use permitted before the Change Date.
+
+Except as expressly permitted in the Additional Use Grant, this License does not permit before the Change Date:
+(a) offering the Licensed Work to third parties as a hosted, managed, software-as-a-service, platform-as-a-service, service-bureau, or similar service;
+(b) sublicensing, white-labeling, reselling, distributing for a fee, or otherwise commercially providing access to the Licensed Work to third parties;
+(c) embedding, incorporating, or bundling the Licensed Work into a commercial product or service whose primary purpose is to compete with the Licensed Work or to enable third parties to access the Licensed Work as part of a commercial offering; or
+(d) Production Use above the limits stated in the Additional Use Grant.
+
+For clarity, internal company use and commercial use are permitted before the Change Date only to the extent they fall within the Additional Use Grant.
+
+4. Redistribution and Derivative Works
+
+You may redistribute the original Licensed Work, modified versions of the Licensed Work, and derivative works of the Licensed Work, provided that:
+
+(a) all such distributions are made under this License until the applicable Change Date for the relevant version;
+(b) you conspicuously include a complete copy of this License with each copy of the Licensed Work, modified version, or derivative work that you distribute;
+(c) you do not remove, alter, or obscure any copyright, trademark, attribution, or other proprietary notices included in the Licensed Work, except to the extent necessary to reflect your own modifications; and
+(d) you clearly mark any files or portions that you modified.
+
+All copies of the original and modified Licensed Work, and derivative works of the Licensed Work, are subject to this License until the applicable Change Date for the relevant version.
+
+5. Version-by-Version Application
+
+This License applies separately to each version of the Licensed Work released by Licensor. The Change Date may vary by version if Licensor so states.
+
+For purposes of determining the earlier of the stated Change Date or the fourth anniversary of first publicly available distribution, the relevant date is the date on which the applicable version of the Licensed Work was first made publicly available by Licensor under this License.
+
+6. Compliance and Commercial Licensing
+
+If your use of the Licensed Work does not comply with the terms currently in effect under this License, including the limits of the Additional Use Grant, then you must either:
+
+(a) immediately cease such use; or
+(b) obtain a separate written commercial license from Licensor, one of its Affiliates, or an authorized reseller.
+
+No right to use the Licensed Work outside the scope of this License arises by implication, estoppel, waiver, or silence.
+
+7. Termination
+
+Any use of the Licensed Work in violation of this License will automatically terminate your rights under this License for the current version of the Licensed Work and any other version of the Licensed Work made available to you by Licensor under this License.
+
+However, if you cure the violation in full within fifteen (15) days after becoming aware of it or receiving notice of it from Licensor, whichever occurs first, then your rights under this License will be reinstated automatically, unless Licensor has previously given you notice of substantially similar violations more than once.
+
+Termination of this License does not limit any rights or remedies available to Licensor at law or in equity.
+
+Sections 6, 7, 8, 9, 10, 11, and 12 survive termination of this License.
+
+8. No Trademark License
+
+This License does not grant you any right, title, or interest in any trademark, trade name, logo, or branding of Licensor or its Affiliates, except solely as necessary to reproduce notices required by this License or to identify the origin of the Licensed Work in a customary nominative manner.
+
+9. Ownership
+
+As between you and Licensor, Licensor retains all right, title, and interest in and to the Licensed Work, including all intellectual property rights therein, except for the limited rights expressly granted under this License.
+
+10. Disclaimer of Warranties
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON AN “AS IS” BASIS. LICENSOR HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS, EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING, WITHOUT LIMITATION, WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, TITLE, ACCURACY, RESULTS, AND QUIET ENJOYMENT.
+
+LICENSOR DOES NOT WARRANT THAT THE LICENSED WORK WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR MEET YOUR REQUIREMENTS.
+
+11. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL LICENSOR OR ITS AFFILIATES BE LIABLE UNDER ANY LEGAL THEORY, WHETHER IN CONTRACT, TORT, NEGLIGENCE, STRICT LIABILITY, OR OTHERWISE, FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, BUSINESS, GOODWILL, DATA, OR USE, ARISING OUT OF OR RELATING TO THIS LICENSE OR THE LICENSED WORK, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE TOTAL AGGREGATE LIABILITY OF LICENSOR AND ITS AFFILIATES ARISING OUT OF OR RELATING TO THIS LICENSE OR THE LICENSED WORK SHALL NOT EXCEED ONE HUNDRED UNITED STATES DOLLARS (USD $100).
+
+SOME JURISDICTIONS DO NOT ALLOW CERTAIN LIMITATIONS OR EXCLUSIONS OF LIABILITY, SO SOME OF THE ABOVE MAY NOT APPLY TO YOU.
+
+12. General
+
+This License constitutes the entire agreement between you and Licensor concerning the Licensed Work licensed hereunder and supersedes all prior or contemporaneous understandings concerning its subject matter.
+
+If any provision of this License is held unenforceable, that provision shall be enforced to the maximum extent permitted by law and the remaining provisions shall remain in full force and effect.
+
+No waiver of any provision of this License shall be effective unless in writing and signed by Licensor. A failure or delay in enforcing any provision of this License shall not operate as a waiver.
+
+You may not assign or transfer this License, in whole or in part, by operation of law or otherwise, without Licensor’s prior written consent. Any attempted assignment in violation of the foregoing is void.
