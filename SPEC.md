@@ -2,13 +2,66 @@
 
 ## 1. Overview
 
-cibuild is a CLI tool for defining and running CI/CD pipelines locally and in CI environments.
+cibuild is a CLI tool for defining and running CI/CD pipelines locally and in CI environments. Supports iOS (Xcode) and Android (Gradle) builds.
 
-- Run `ci init` to scaffold a new project and check dependencies
-- Run with: `ci run pipeline -p <path> -w <workflow>`
-- Supports iOS (Xcode) and Android (Gradle) builds
+## 2. Getting Started
 
-## 2. Step Dependency Ordering
+**Always start with `ci init`.** This is the entry point for every new project — do not manually create pipeline files or directories.
+
+### Step 1: Initialize
+
+From the root of your Android or iOS project:
+
+```bash
+ci init
+```
+
+This will:
+1. Check that required dependencies are installed (git, node, xcodebuild, etc.)
+2. Prompt you to either **create a new pipeline** (interactive) or **import an existing YAML pipeline**
+3. Create the `.ci/pipelines/` directory and place your pipeline file there
+4. Add CI Build runtime files to `.gitignore`
+
+### Step 2: Write your pipeline
+
+Pipeline files use YAML format with a `workflows` key containing named workflows. Each workflow has a `steps` array. Here is the simplest possible pipeline:
+
+```yaml
+workflows:
+  test:
+    steps:
+      - script@1.0.0:
+          inputs:
+            content: |
+              echo "Hello from CI"
+```
+
+See **Section 5** (Step Catalog) and **Section 6** (Common Patterns) below for all available steps and real-world examples.
+
+### Step 3: Run
+
+```bash
+# Run using the pipeline in .ci/pipelines/ (set up by ci init)
+ci run
+
+# Or run a specific pipeline file directly
+ci run pipeline.yml
+
+# Run locally (for development)
+ci run pipeline.yml --local
+
+# Run a specific workflow
+ci run pipeline.yml -w release
+```
+
+### Step 4: Add secrets (if needed)
+
+```bash
+ci secrets add KEYSTORE_PASSWORD pipeline.yml
+ci secrets add KEYSTORE_BASE64 pipeline.yml --file release.keystore
+```
+
+## 3. Step Dependency Ordering
 
 Steps produce outputs (environment variables, files) that downstream steps consume. The table below defines which steps must run before others. **Always respect this ordering when composing workflows.**
 
@@ -98,7 +151,7 @@ When composing a workflow, follow this general ordering:
 14. `cache-push`
 15. `slack` (with `is_always_run: true`)
 
-## 3. Variable Syntax
+## 4. Variable Syntax
 
 | Syntax | Example | Description |
 |---|---|---|
@@ -107,7 +160,7 @@ When composing a workflow, follow this general ordering:
 | `{{getenv "VAR"}}` | `{{getenv "SCHEME"}}` | Template function |
 | `{{checksum "path"}}` | `{{checksum "Gemfile.lock"}}` | Content-based hash for cache keys |
 
-## 4. Step Catalog
+## 5. Step Catalog
 
 <!-- BEGIN STEP CATALOG -->
 
@@ -1318,7 +1371,7 @@ When composing a workflow, follow this general ordering:
 ---
 <!-- END STEP CATALOG -->
 
-## 5. Common Patterns
+## 6. Common Patterns
 
 ### iOS CI Workflow
 
@@ -1765,7 +1818,7 @@ Dual-build: AAB for internal Play Store track + APK for testers:
             text: "Android nightly build ready"
 ```
 
-## 6. Secrets
+## 7. Secrets
 
 Set secrets via CLI: `ci secrets add <KEY>` (global) or `ci secrets add <KEY> -w <workflow>` (workflow-scoped).
 
