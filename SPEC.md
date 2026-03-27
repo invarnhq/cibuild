@@ -4,63 +4,11 @@
 
 cibuild is a CLI tool for defining and running CI/CD pipelines locally and in CI environments.
 
-- Pipelines are defined as YAML files in the `.ci/pipelines/` directory
+- Run `ci init` to scaffold a new project and check dependencies
 - Run with: `ci run pipeline -p <path> -w <workflow>`
 - Supports iOS (Xcode) and Android (Gradle) builds
 
-## 2. Pipeline YAML Format
-
-Full schema with annotations:
-
-```yaml
-format_version: '1'
-
-meta:
-  cibuild.io:
-    stack: macos-ventura-xcode-15.1    # Platform stack
-    machine_type: standard              # standard | performance
-
-app:
-  envs:
-    - PROJECT_PATH: ./MyApp
-    - BUILD_TYPE: Release
-
-workflows:
-  primary:
-    envs:
-      - SCHEME: MyApp
-    steps:
-      - git-clone@1.0.0:
-          inputs:
-            clone_depth: 1
-      - xcodebuild@1.0.0:
-          title: Build iOS App
-          inputs:
-            project_path: $PROJECT_PATH/MyApp.xcworkspace
-            scheme: $SCHEME
-          is_skippable: false
-```
-
-### Key Fields
-
-| Field | Required | Description |
-|---|---|---|
-| `format_version` | Yes | Always `'1'` |
-| `meta.cibuild.io.stack` | Yes | Build environment stack |
-| `meta.cibuild.io.machine_type` | No | `standard` (default) or `performance` |
-| `app.envs` | No | Global environment variables available to all workflows |
-| `workflows.<name>.envs` | No | Workflow-scoped environment variables |
-| `workflows.<name>.steps` | Yes | Ordered list of steps to execute |
-
-### Step Fields
-
-| Field | Required | Description |
-|---|---|---|
-| `title` | No | Display name for the step |
-| `inputs` | No | Key-value map of step inputs |
-| `is_skippable` | No | If `true`, step failure does not abort the pipeline |
-
-## 3. Step Dependency Ordering
+## 2. Step Dependency Ordering
 
 Steps produce outputs (environment variables, files) that downstream steps consume. The table below defines which steps must run before others. **Always respect this ordering when composing workflows.**
 
@@ -150,7 +98,7 @@ When composing a workflow, follow this general ordering:
 14. `cache-push`
 15. `slack` (with `is_always_run: true`)
 
-## 4. Variable Syntax
+## 3. Variable Syntax
 
 | Syntax | Example | Description |
 |---|---|---|
@@ -159,7 +107,7 @@ When composing a workflow, follow this general ordering:
 | `{{getenv "VAR"}}` | `{{getenv "SCHEME"}}` | Template function |
 | `{{checksum "path"}}` | `{{checksum "Gemfile.lock"}}` | Content-based hash for cache keys |
 
-## 5. Step Catalog
+## 4. Step Catalog
 
 <!-- BEGIN STEP CATALOG -->
 
@@ -1370,7 +1318,7 @@ When composing a workflow, follow this general ordering:
 ---
 <!-- END STEP CATALOG -->
 
-## 6. Common Patterns
+## 5. Common Patterns
 
 ### iOS CI Workflow
 
@@ -1817,7 +1765,7 @@ Dual-build: AAB for internal Play Store track + APK for testers:
             text: "Android nightly build ready"
 ```
 
-## 7. Secrets
+## 6. Secrets
 
 Set secrets via CLI: `ci secrets add <KEY>` (global) or `ci secrets add <KEY> -w <workflow>` (workflow-scoped).
 
