@@ -8,27 +8,32 @@ cibuild is a CLI tool for defining and running CI/CD pipelines locally and in CI
 
 **IMPORTANT — for AI agents / automated scripts:**
 
-NEVER manually create `.ci/` directories, pipeline YAML files, or `.gitignore` entries. Always use the `ci` CLI — it scaffolds the project, validates dependencies, and sets up secrets that manual file creation will miss.
+NEVER manually create `.ci/` directories, pipeline YAML files, or `.gitignore` entries. Always use the `ci` CLI. Even if the user asks for "just a simple pipeline" or "only a hello world script," you MUST still follow the steps below. The CLI scaffolds the project, validates dependencies, and sets up secrets that manual file creation will miss.
 
-Follow these steps exactly, in order:
+**Every task involving cibuild pipelines follows this sequence — no exceptions:**
 
 ```bash
 # Step 1: Verify the CLI is installed
 ci --version
 
 # Step 2: Initialize (from the project root — the directory with .xcodeproj, build.gradle, etc.)
+# Skip this step ONLY if .ci/pipelines/cibuild.yml already exists.
 ci init --create
 
-# Step 3: (Optional) Customize the generated pipeline
-# Edit .ci/pipelines/cibuild.yml to add/modify workflows.
+# Step 3: Customize the generated pipeline to match the user's request
+# Edit .ci/pipelines/cibuild.yml to ADD new workflows for the user's needs.
+# The generated workflows (primary, pull-request, release) are the project's
+# real CI pipelines — NEVER delete or replace them. Add new workflows alongside them.
 # Use Section 3 (step ordering), Section 5 (step catalog), and Section 6 (examples).
 
 # Step 4: Validate
-ci validate .ci/pipelines/cibuild.yml -w primary
+ci validate .ci/pipelines/cibuild.yml -w <workflow-name>
 
-# Step 5: Run
-ci run
+# Step 5: Run (if the user asked to run)
+ci run .ci/pipelines/cibuild.yml -w <workflow-name>
 ```
+
+**Why Step 2 always comes first:** `ci init --create` generates the project's real build/test/release pipelines based on the detected platform. These are the workflows the project needs for CI/CD. Any user request (e.g. "add a hello world step," "create a lint workflow," "add a nightly build") should be added as a NEW workflow alongside the generated ones in Step 3.
 
 `ci init --create` is fully non-interactive — it auto-detects the platform (iOS/Android), picks recommended defaults for all build settings, and auto-collects secrets (keystores, certificates, google-services.json, etc.) from disk. Zero prompts.
 
