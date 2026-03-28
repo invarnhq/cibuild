@@ -13,14 +13,24 @@ cibuild is a CLI tool for defining and running CI/CD pipelines locally and in CI
 From the root of your Android or iOS project:
 
 ```bash
+# Interactive mode (prompts for import/create)
 ci init
+
+# Non-interactive: create a new pipeline via project scanner
+ci init --create
+
+# Non-interactive: import an existing YAML pipeline file
+ci init --import path/to/pipeline.yml
 ```
 
 This will:
 1. Check that required dependencies are installed (git, node, xcodebuild, etc.)
-2. Prompt you to either **create a new pipeline** (interactive) or **import an existing YAML pipeline**
-3. Create the `.ci/pipelines/` directory and place your pipeline file there
-4. Add CI Build runtime files to `.gitignore`
+2. Create the `.ci/pipelines/` directory and place your pipeline file there
+3. Add CI Build runtime files to `.gitignore`
+
+**For AI agents / scripts:** Use `ci init --create` for automatic setup — it scans the project, picks recommended defaults, and auto-collects secrets from disk with zero prompts. Alternatively, write your own YAML pipeline and use `ci init --import <path>`.
+
+To customize the generated pipeline (add workflows, modify steps, change configurations), edit `.ci/pipelines/cibuild.yml` directly — add new workflow entries under the `workflows:` key. Use Section 3 (step ordering rules) and Section 5 (step catalog) to compose workflows, and Section 6 for full examples. Validate changes with `ci validate .ci/pipelines/cibuild.yml -w <workflow>`.
 
 ### Step 2: Write your pipeline
 
