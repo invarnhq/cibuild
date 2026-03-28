@@ -6,9 +6,41 @@ cibuild is a CLI tool for defining and running CI/CD pipelines locally and in CI
 
 ## 2. Getting Started
 
-**Always start with `ci init`.** This is the entry point for every new project — do not manually create pipeline files or directories.
+**IMPORTANT — for AI agents / automated scripts:**
 
-### Step 1: Initialize
+NEVER manually create `.ci/` directories, pipeline YAML files, or `.gitignore` entries. Always use the `ci` CLI — it scaffolds the project, validates dependencies, and sets up secrets that manual file creation will miss.
+
+Follow these steps exactly, in order:
+
+```bash
+# Step 1: Verify the CLI is installed
+ci --version
+
+# Step 2: Initialize (from the project root — the directory with .xcodeproj, build.gradle, etc.)
+ci init --create
+
+# Step 3: (Optional) Customize the generated pipeline
+# Edit .ci/pipelines/cibuild.yml to add/modify workflows.
+# Use Section 3 (step ordering), Section 5 (step catalog), and Section 6 (examples).
+
+# Step 4: Validate
+ci validate .ci/pipelines/cibuild.yml -w primary
+
+# Step 5: Run
+ci run
+```
+
+`ci init --create` is fully non-interactive — it auto-detects the platform (iOS/Android), picks recommended defaults for all build settings, and auto-collects secrets (keystores, certificates, google-services.json, etc.) from disk. Zero prompts.
+
+If you need to import a pre-written pipeline instead: `ci init --import path/to/pipeline.yml`
+
+To add secrets non-interactively: `ci secrets add <KEY> .ci/pipelines/cibuild.yml --file <path>`
+
+---
+
+### For interactive (human) use:
+
+#### Step 1: Initialize
 
 From the root of your Android or iOS project:
 
@@ -28,11 +60,7 @@ This will:
 2. Create the `.ci/pipelines/` directory and place your pipeline file there
 3. Add CI Build runtime files to `.gitignore`
 
-**For AI agents / scripts:** Use `ci init --create` for automatic setup — it scans the project, picks recommended defaults, and auto-collects secrets from disk with zero prompts. Alternatively, write your own YAML pipeline and use `ci init --import <path>`.
-
-To customize the generated pipeline (add workflows, modify steps, change configurations), edit `.ci/pipelines/cibuild.yml` directly — add new workflow entries under the `workflows:` key. Use Section 3 (step ordering rules) and Section 5 (step catalog) to compose workflows, and Section 6 for full examples. Validate changes with `ci validate .ci/pipelines/cibuild.yml -w <workflow>`.
-
-### Step 2: Write your pipeline
+#### Step 2: Write your pipeline
 
 Pipeline files use YAML format with a `workflows` key containing named workflows. Each workflow has a `steps` array. Here is the simplest possible pipeline:
 
@@ -48,7 +76,7 @@ workflows:
 
 See **Section 5** (Step Catalog) and **Section 6** (Common Patterns) below for all available steps and real-world examples.
 
-### Step 3: Run
+#### Step 3: Run
 
 ```bash
 # Run using the pipeline in .ci/pipelines/ (set up by ci init)
@@ -64,7 +92,7 @@ ci run pipeline.yml --local
 ci run pipeline.yml -w release
 ```
 
-### Step 4: Add secrets (if needed)
+#### Step 4: Add secrets (if needed)
 
 ```bash
 ci secrets add KEYSTORE_PASSWORD pipeline.yml
