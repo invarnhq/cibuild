@@ -1,8 +1,6 @@
 # cibuild
 
-Lightweight CI/CD pipeline runner for Android and iOS projects. Define your pipelines in YAML or TypeScript and run them locally or dispatch to a remote runner — no CI server required.
-
----
+Lightweight CI/CD pipeline runner for Android and iOS projects. Define pipelines in YAML, run them locally or on a remote runner.
 
 ## Install
 
@@ -21,30 +19,68 @@ curl -fsSL https://raw.githubusercontent.com/invarnhq/cibuild/main/install.sh | 
 
 Both methods install two identical commands: `ci` and `cibuild`.
 
----
+## Getting Started
 
-## Quick Start
+### Option 1. Auto-create (recommended)
+
+From your project root, let cibuild scan the project and generate a pipeline with recommended defaults:
 
 ```bash
-# From the root of your Android or iOS project:
-ci init              # Check dependencies and set up your pipeline
-ci run pipeline.yml  # Run on remote runner
-ci run pipeline.yml --local  # Run locally for development
+ci init --create
 ```
 
----
+This auto-detects the platform (iOS/Android), configures build settings, and collects secrets from disk — fully non-interactive, works with AI agents and scripts.
+
+### Option 2. Interactive wizard
+
+Walk through prompts to configure your pipeline step by step:
+
+```bash
+ci init
+```
+
+### Option 3. Import existing pipeline
+
+If you already have a pipeline YAML file:
+
+```bash
+ci init --import path/to/pipeline.yml
+```
+
+All three methods scaffold the `.ci/pipelines/` directory, validate dependencies, and set up `.gitignore`.
+
+### Customize
+
+cibuild works best when you start with `ci init --create` and build on top of the generated pipeline. The full pipeline format, step catalog, and customization rules are in the spec.
+
+Tell your AI coding agent:
+
+> Set up and customize CI/CD pipelines for this project using cibuild according to the following spec: https://github.com/invarnhq/cibuild/blob/main/SPEC.md
+
+### Run
+
+```bash
+ci run                                         # Run the default pipeline
+ci run .ci/pipelines/cibuild.yml -w release    # Run a specific workflow
+```
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `ci init` | Check dependencies and set up your pipeline interactively |
-| `ci run <path> [-w <name>]` | Run pipeline on remote runner (production) |
-| `ci run <path> [-w <name>] --local` | Run pipeline locally (development) |
-| `ci edit <path> [-w <name>]` | Inspect and edit step inputs interactively |
-| `ci secrets add <var> <path>` | Store a secret (prompted interactively) |
-| `ci secrets add <var> <path> --file <file>` | Store a secret from a file |
-| `ci detect-platform <path> [-w <name>]` | Detect platform from a YAML pipeline |
+| `ci init` | Interactive setup wizard |
+| `ci init --create` | Auto-create pipeline (non-interactive) |
+| `ci init --import <path>` | Import YAML pipeline (non-interactive) |
+| `ci build` | Generate a standard pipeline for the current project |
+| `ci run <path> [-w <name>]` | Run pipeline locally (development mode) |
+| `ci run <path> [-w <name>] --production` | Run on remote runner (production) |
+| `ci run <path> [-w <name>] --validate-only` | Validate only, don't execute |
+| `ci run <path> [-w <name>] --skip-validation` | Skip validation, run with interactive prompts |
+| `ci validate <path> [-w <name>]` | Validate pipeline (alias for --validate-only) |
+| `ci detect-platform <path> [-w <name>]` | Detect platform from YAML pipeline |
+| `ci edit <path> [-w <name>]` | View pipeline and edit step inputs |
+| `ci secrets add <var> <path> [-w <name>]` | Add a secret (prompted interactively) |
+| `ci secrets add <var> <path> --file <file>` | Add a secret from a file |
 | `ci --help` | Show help |
 
 ### Options
@@ -52,51 +88,19 @@ ci run pipeline.yml --local  # Run locally for development
 | Flag | Description |
 |---|---|
 | `-w, --workflow <name>` | Select a workflow (YAML pipelines only, defaults to first) |
-| `--local` | Run pipeline locally instead of on a remote runner |
-| `--skip-validation` | Skip pre-execution validation |
-
----
-
-## Pipeline Format
-
-### YAML
-
-```yaml
-# android-build.yml
-workflows:
-  release:
-    steps:
-      - script:
-          inputs:
-            - content: ./gradlew assembleRelease
-```
-
-Run it:
-
-```bash
-ci run android-build.yml -w release
-```
-
-**Supported extensions:** `.yml`, `.yaml`
-
----
+| `--production` | Execute on remote runner after validation (vs local) |
+| `--validate-only` | Run validation only, don't execute pipeline |
+| `--skip-validation` | Skip pre-execution validation (for development) |
 
 ## Secrets
 
-Secrets are stored locally in `~/.cibuild-secrets.json` and never committed.
+Secrets are stored locally in `.cibuild-secrets.json` and never committed.
 
 ```bash
-# Store a secret interactively
-ci secrets add KEYSTORE_PASSWORD android-build.yml
-
-# Store a secret from a file (e.g. a base64-encoded keystore)
-ci secrets add KEYSTORE_BASE64 android-build.yml --file release.keystore
-
-# Store a secret scoped to a specific workflow
-ci secrets add SLACK_WEBHOOK android-build.yml -w release
+ci secrets add KEYSTORE_PASSWORD pipeline.yml
+ci secrets add KEYSTORE_BASE64 pipeline.yml --file release.keystore
+ci secrets add SLACK_WEBHOOK pipeline.yml -w release
 ```
-
----
 
 ## Requirements
 
@@ -105,14 +109,3 @@ ci secrets add SLACK_WEBHOOK android-build.yml -w release
 - iOS projects: Xcode (CocoaPods optional)
 
 Run `ci init` from your project root to check all dependencies automatically.
-
----
-
-## Examples
-
-```bash
-ci run ios-build.yml -w pull-request
-ci run ios-build.yml -w pull-request --local
-ci run ios-build.yml -w release
-ci edit android-build.yml -w debug
-```
