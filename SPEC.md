@@ -115,7 +115,8 @@ Steps produce outputs (environment variables, files) that downstream steps consu
 | `git-clone` | `activate-ssh-key` (if repo is private) | SSH key must be available before git operations |
 | `cache-pull` | `git-clone` | Needs `CIBUILD_SOURCE_DIR` to resolve cache paths |
 | `cache-push` | all build/test steps | Must run at end of workflow so caches include build outputs |
-| `deploy-to-bitrise-io` | build/archive step that produces artifacts | Uploads `CIBUILD_IPA_PATH`, `CIBUILD_APK_PATH`, etc. |
+| `app-store-deploy` | `xcode-archive` | Uploads `CIBUILD_IPA_PATH` to App Store Connect via fastlane deliver |
+| `google-play-deploy` | `gradle-build` or `android-build` | Uploads `CIBUILD_APK_PATH` or `CIBUILD_AAB_PATH` to Google Play via fastlane supply |
 | `slack` | all other steps (use `is_always_run: true`) | Notification sent after all work is done |
 | `script` | depends on what the script does | No automatic dependencies |
 | `file` | before the step that reads the written file | Writes secret files to disk at runtime |
@@ -139,7 +140,7 @@ Steps produce outputs (environment variables, files) that downstream steps consu
 | `export-xcarchive` | `xcode-archive` (or any step producing `.xcarchive`) | Consumes `CIBUILD_XCARCHIVE_PATH`, exports IPA |
 | `ios-archive` | `xcodebuild` | Packages `.app` into IPA |
 | `app-store-deploy` | `xcode-archive` | Uploads `CIBUILD_IPA_PATH` to App Store Connect |
-| `ota-install` | `xcode-archive` or `deploy-to-bitrise-io` | Generates OTA manifest from IPA URL |
+| `ota-install` | `xcode-archive` | Generates OTA manifest from IPA URL |
 | `fastlane` | `git-clone`, dependency step if used | Runs a Fastlane lane that reads the project |
 
 #### Android Steps
@@ -190,7 +191,7 @@ When composing a workflow, follow this general ordering:
 10. Build / Archive (`xcode-archive`, `gradle-build`, `flutter-build`)
 11. Signing (`sign-apk`)
 12. Deployment (`app-store-deploy`, `google-play-deploy`, `github-release`)
-13. Artifact upload (`deploy-to-bitrise-io`, `ota-install`)
+13. Artifact upload (`ota-install`)
 14. `cache-push`
 15. `slack` (with `is_always_run: true`)
 
@@ -277,28 +278,6 @@ When composing a workflow, follow this general ordering:
 ```
 
 ---
-### deploy-to-bitrise-io@1.0.0
-**Platform:** All
-
-> Uploads build artifacts to S3 storage and exports an install page URL for downstream steps. Auto-detects artifacts directory if deploy_path is not set. Skipped in local mode.
-
-**Agent Notes:** Uploads build artifacts to S3 storage. Auto-detects artifacts directory if deploy_path not set. Exports install page URL for downstream steps (e.g. slack notification). Skipped in local mode.
-
-**Inputs:**
-| Name | Required | Default | Description |
-|------|----------|---------|-------------|
-| deploy_path | no | - | Path to the artifact file or directory to upload |
-| notify_user_groups | no | - | User groups to notify (ignored) |
-
-**Outputs:** `CIBUILD_PUBLIC_INSTALL_PAGE_URL`, `CI_INSTALL_PAGE_URL`
-
-**Example:**
-```yaml
-- deploy-to-bitrise-io@1.0.0:
-    inputs:
-      deploy_path: "$CIBUILD_IPA_PATH"
-```
-
 ---
 ### fastlane@1.0.0
 **Platform:** All
@@ -646,7 +625,7 @@ When composing a workflow, follow this general ordering:
 
 > Installs Apple code signing certificates (.p12) and provisioning profiles into the macOS keychain for Xcode builds. Supports multiple certificates and profiles via pipe-separated URLs. Handles both remote URLs and local file:// paths.
 
-**Agent Notes:** Use before xcode-archive or any step that requires code signing. Maps from Bitrise certificate-and-profile-installer step. Requires certificate_url and keychain_password at minimum. Provisioning profiles are installed to ~/Library/MobileDevice/Provisioning Profiles/.
+**Agent Notes:** Use before xcode-archive or any step that requires code signing. Requires certificate_url and keychain_password at minimum. Provisioning profiles are installed to ~/Library/MobileDevice/Provisioning Profiles/.
 
 **Requires:** commands: `security`
 
@@ -1245,7 +1224,7 @@ When composing a workflow, follow this general ordering:
 
 > Runs detekt Kotlin static analysis via the Gradle detekt task. Supports module-level and project-level analysis with additional Gradle arguments.
 
-**Agent Notes:** Use after git-clone and set-java-version. Requires the detekt Gradle plugin configured in the project. Maps from Bitrise android-detekt step.
+**Agent Notes:** Use after git-clone and set-java-version. Requires the detekt Gradle plugin configured in the project.
 
 **Requires:** steps: `git-clone`, `set-java-version`
 
@@ -1489,10 +1468,9 @@ Lint, test, and build for review — with CocoaPods caching and QR code for test
             project_path: $WORKSPACE_PATH
             scheme: $SCHEME
             distribution_method: development
-      - deploy-to-bitrise-io@1.0.0
       - ota-install@1.0.0:
           inputs:
-            ipa_url: "$CIBUILD_PUBLIC_INSTALL_PAGE_URL"
+            ipa_url: "$CIBUILD_IPA_PATH"
             bundle_id: com.example.MyApp
             bundle_version: "1.0.0"
             title: "MyApp PR Build"
@@ -1607,7 +1585,10 @@ workflows:
           inputs:
             project_location: $PROJECT_LOCATION
             gradle_task: assembleRelease
-      - deploy-to-bitrise-io@1.0.0
+      - google-play-deploy@1.0.0:
+          inputs:
+            package_name: com.example.myapp
+            track: internal
       - cache-push@1.0.0:
           inputs:
             technology: gradle
@@ -1801,10 +1782,9 @@ Dual-build: App Store release for TestFlight + development build for testers:
             project_path: $WORKSPACE_PATH
             scheme: $SCHEME
             distribution_method: development
-      - deploy-to-bitrise-io@1.0.0
       - ota-install@1.0.0:
           inputs:
-            ipa_url: "$CIBUILD_PUBLIC_INSTALL_PAGE_URL"
+            ipa_url: "$CIBUILD_IPA_PATH"
             bundle_id: com.example.MyApp
             bundle_version: "1.0.0"
             title: "MyApp Nightly"
@@ -1852,7 +1832,6 @@ Dual-build: AAB for internal Play Store track + APK for testers:
           inputs:
             project_location: $PROJECT_LOCATION
             gradle_task: assembleDebug
-      - deploy-to-bitrise-io@1.0.0
       - slack@1.0.0:
           is_always_run: true
           inputs:
