@@ -25,58 +25,6 @@ npm install -g @invarn/cibuild
 
 All methods install two identical commands: `ci` and `cibuild`.
 
-## GitHub Actions
-
-Use cibuild directly in your GitHub Actions workflows:
-
-```yaml
-name: CI
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: macos-latest
-    environment: cibuild
-    steps:
-      - uses: actions/checkout@v4
-      - uses: invarnhq/cibuild@v1
-        with:
-          workflow: release
-```
-
-### Action Inputs
-
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `pipeline` | No | Auto-discover | Path to pipeline YAML file |
-| `workflow` | No | First workflow | Workflow name within the pipeline |
-| `version` | No | `latest` | cibuild version to install |
-
-### Secrets in GitHub Actions
-
-Upload your local secrets to a GitHub Environment, then reference them in your workflow:
-
-```bash
-ci secrets upload --env cibuild
-```
-
-```yaml
-jobs:
-  build:
-    runs-on: macos-latest
-    environment: cibuild
-    env:
-      CIBUILD_S__SLACK_WEBHOOK: ${{ secrets.CIBUILD_S__SLACK_WEBHOOK }}
-      CIBUILD_SW__RELEASE__KEYSTORE_PASS: ${{ secrets.CIBUILD_SW__RELEASE__KEYSTORE_PASS }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: invarnhq/cibuild@v1
-        with:
-          workflow: release
-```
-
-The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`).
-
 ## Getting Started
 
 ### Option 1. Auto-create (recommended)
@@ -159,6 +107,58 @@ ci secrets add KEYSTORE_PASSWORD pipeline.yml
 ci secrets add KEYSTORE_BASE64 pipeline.yml --file release.keystore
 ci secrets add SLACK_WEBHOOK pipeline.yml -w release
 ```
+
+## GitHub Actions
+
+Use cibuild directly in your GitHub Actions workflows:
+
+```yaml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    environment: cibuild
+    steps:
+      - uses: actions/checkout@v4
+      - uses: invarnhq/cibuild@v1
+        with:
+          workflow: release
+```
+
+### Action Inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `pipeline` | No | Auto-discover | Path to pipeline YAML file |
+| `workflow` | No | First workflow | Workflow name within the pipeline |
+| `version` | No | `latest` | cibuild version to install |
+
+### Secrets in GitHub Actions
+
+Upload your local secrets to a GitHub Environment, then reference them in your workflow:
+
+```bash
+ci secrets upload --env cibuild
+```
+
+```yaml
+jobs:
+  build:
+    runs-on: macos-latest
+    environment: cibuild
+    env:
+      CIBUILD_S__SLACK_WEBHOOK: ${{ secrets.CIBUILD_S__SLACK_WEBHOOK }}
+      CIBUILD_SW__RELEASE__KEYSTORE_PASS: ${{ secrets.CIBUILD_SW__RELEASE__KEYSTORE_PASS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: invarnhq/cibuild@v1
+        with:
+          workflow: release
+```
+
+The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`).
 
 ## Requirements
 
