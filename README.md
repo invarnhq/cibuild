@@ -35,7 +35,7 @@ From your project root, let cibuild scan the project and generate a pipeline wit
 ci init --create
 ```
 
-This auto-detects the platform (iOS/Android), configures build settings, and collects secrets from disk — fully non-interactive, works with AI agents and scripts.
+This auto-detects the platform (iOS/Android), configures build settings, collects secrets from disk, and generates a ready-to-use GitHub Actions workflow — fully non-interactive, works with AI agents and scripts.
 
 ### Option 2. Interactive wizard
 
@@ -53,7 +53,7 @@ If you already have a pipeline YAML file:
 ci init --import path/to/pipeline.yml
 ```
 
-All three methods scaffold the `.ci/pipelines/` directory, validate dependencies, and set up `.gitignore`.
+All three methods scaffold the `.ci/pipelines/` directory, generate `.github/workflows/ci.yml`, validate dependencies, and set up `.gitignore`.
 
 ### Customize
 
