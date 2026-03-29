@@ -17,7 +17,65 @@ brew install cibuild
 curl -fsSL https://raw.githubusercontent.com/invarnhq/cibuild/main/install.sh | bash
 ```
 
-Both methods install two identical commands: `ci` and `cibuild`.
+**npm**
+
+```bash
+npm install -g @invarn/cibuild
+```
+
+All methods install two identical commands: `ci` and `cibuild`.
+
+## GitHub Actions
+
+Use cibuild directly in your GitHub Actions workflows:
+
+```yaml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    environment: cibuild
+    steps:
+      - uses: actions/checkout@v4
+      - uses: invarnhq/cibuild@v1
+        with:
+          workflow: release
+```
+
+### Action Inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `pipeline` | No | Auto-discover | Path to pipeline YAML file |
+| `workflow` | No | First workflow | Workflow name within the pipeline |
+| `version` | No | `latest` | cibuild version to install |
+
+### Secrets in GitHub Actions
+
+Upload your local secrets to a GitHub Environment, then reference them in your workflow:
+
+```bash
+ci secrets upload --env cibuild
+```
+
+```yaml
+jobs:
+  build:
+    runs-on: macos-latest
+    environment: cibuild
+    env:
+      CIBUILD_S__SLACK_WEBHOOK: ${{ secrets.CIBUILD_S__SLACK_WEBHOOK }}
+      CIBUILD_SW__RELEASE__KEYSTORE_PASS: ${{ secrets.CIBUILD_SW__RELEASE__KEYSTORE_PASS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: invarnhq/cibuild@v1
+        with:
+          workflow: release
+```
+
+The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`).
 
 ## Getting Started
 
@@ -104,8 +162,8 @@ ci secrets add SLACK_WEBHOOK pipeline.yml -w release
 
 ## Requirements
 
-- macOS (arm64 or x64)
+- macOS or Linux (Node.js 18+ for npm install)
 - Android projects: JDK, Android SDK
-- iOS projects: Xcode (CocoaPods optional)
+- iOS projects: macOS with Xcode (CocoaPods optional)
 
 Run `ci init` from your project root to check all dependencies automatically.

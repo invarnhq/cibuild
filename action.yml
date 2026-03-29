@@ -1,0 +1,64 @@
+name: 'cibuild'
+description: 'Run mobile CI/CD pipelines for iOS and Android projects'
+author: 'invarnhq'
+
+branding:
+  icon: 'play-circle'
+  color: 'blue'
+
+inputs:
+  pipeline:
+    description: 'Path to pipeline YAML file (default: auto-discover from .ci/pipelines/)'
+    required: false
+    default: ''
+  workflow:
+    description: 'Workflow name within the pipeline'
+    required: false
+    default: ''
+  version:
+    description: 'cibuild version to install (e.g. "1.2.3"). Default: latest'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install cibuild
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ] || [ -z "$VERSION" ]; then
+          npm install -g @invarn/cibuild
+        else
+          npm install -g "@invarn/cibuild@${VERSION}"
+        fi
+        echo "Installed $(cibuild --version)"
+
+    - name: Run pipeline
+      shell: bash
+      env:
+        GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
+        GIT_COMMIT: ${{ github.sha }}
+        GIT_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        BUILD_NUMBER: ${{ github.run_number }}
+        BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        CMD="ci run"
+
+        PIPELINE="${{ inputs.pipeline }}"
+        if [ -n "$PIPELINE" ]; then
+          if [ ! -f "$PIPELINE" ]; then
+            echo "::error::Pipeline file not found: $PIPELINE"
+            exit 1
+          fi
+          CMD="$CMD $PIPELINE"
+        fi
+
+        WORKFLOW="${{ inputs.workflow }}"
+        if [ -n "$WORKFLOW" ]; then
+          CMD="$CMD -w $WORKFLOW"
+        fi
+
+        echo "Running: $CMD"
+        echo ""
+        eval "$CMD"
