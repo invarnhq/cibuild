@@ -1,6 +1,6 @@
 # cibuild
 
-Lightweight CI/CD pipeline runner for Android and iOS projects. Define pipelines in YAML, run them locally or on a remote runner.
+The fastest way to set up iOS and Android CI on GitHub - define pipelines in YAML, run locally or on GitHub Actions.
 
 ## Install
 
