@@ -160,6 +160,12 @@ jobs:
 
 The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`).
 
+## Example
+
+See [CITestiOS](https://github.com/invarnhq/CITestiOS) for a complete iOS project using cibuild on GitHub Actions:
+
+[![CI](https://github.com/invarnhq/CITestiOS/actions/workflows/ci.yml/badge.svg)](https://github.com/invarnhq/CITestiOS/actions/workflows/ci.yml)
+
 ## Requirements
 
 - macOS or Linux (Node.js 18+ for npm install)
