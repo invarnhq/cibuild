@@ -87,6 +87,8 @@ ci run .ci/pipelines/cibuild.yml -w release    # Run a specific workflow
 | `ci edit <path> [-w <name>]` | View pipeline and edit step inputs |
 | `ci secrets add <var> <path> [-w <name>]` | Add a secret (prompted interactively) |
 | `ci secrets add <var> <path> --file <file>` | Add a secret from a file |
+| `ci secrets upload [--env <name>]` | Upload secrets to GitHub environment |
+| `ci secrets sync-workflow <path>` | Sync secret mappings into workflow YAML |
 | `ci --help` | Show help |
 
 ### Options
@@ -107,6 +109,17 @@ ci secrets add KEYSTORE_PASSWORD pipeline.yml
 ci secrets add KEYSTORE_BASE64 pipeline.yml --file release.keystore
 ci secrets add SLACK_WEBHOOK pipeline.yml -w release
 ```
+
+### Deploy to GitHub
+
+Push all local secrets to a GitHub Environment and sync your workflow in two commands:
+
+```bash
+ci secrets upload --env cibuild
+ci secrets sync-workflow .github/workflows/ci.yml
+```
+
+`upload` pushes every secret to the `cibuild` environment on GitHub. `sync-workflow` adds the required `env:` mappings to your workflow file so the action can read them. Requires [GitHub CLI](https://cli.github.com/) (`gh auth login`).
 
 ## GitHub Actions
 
@@ -135,30 +148,7 @@ jobs:
 | `workflow` | No | First workflow | Workflow name within the pipeline |
 | `version` | No | `latest` | cibuild version to install |
 
-### Secrets in GitHub Actions
-
-Upload your local secrets to a GitHub Environment, then reference them in your workflow:
-
-```bash
-ci secrets upload --env cibuild
-```
-
-```yaml
-jobs:
-  build:
-    runs-on: macos-latest
-    environment: cibuild
-    env:
-      CIBUILD_S__SLACK_WEBHOOK: ${{ secrets.CIBUILD_S__SLACK_WEBHOOK }}
-      CIBUILD_SW__RELEASE__KEYSTORE_PASS: ${{ secrets.CIBUILD_SW__RELEASE__KEYSTORE_PASS }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: invarnhq/cibuild@v1
-        with:
-          workflow: release
-```
-
-The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`).
+The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`). See [Secrets](#secrets) for setting up secret access in CI.
 
 ## Examples
 
