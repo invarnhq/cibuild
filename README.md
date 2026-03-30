@@ -115,7 +115,7 @@ ci secrets add SLACK_WEBHOOK pipeline.yml -w release
 Push all local secrets to a GitHub Environment and sync your workflow in two commands:
 
 ```bash
-ci secrets upload --env cibuild
+ci secrets upload
 ci secrets sync-workflow .github/workflows/ci.yml
 ```
 
