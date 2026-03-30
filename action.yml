@@ -1,4 +1,4 @@
-name: 'cibuild'
+name: 'cibuild-action'
 description: 'Run mobile CI/CD pipelines for iOS and Android projects'
 author: 'invarnhq'
 
@@ -47,7 +47,7 @@ runs:
 
         PIPELINE="${{ inputs.pipeline }}"
         if [ -n "$PIPELINE" ]; then
-          if [ ! -f "$PIPELINE" ]; then
+          if [ \! -f "$PIPELINE" ]; then
             echo "::error::Pipeline file not found: $PIPELINE"
             exit 1
           fi
