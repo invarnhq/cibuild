@@ -34,6 +34,33 @@ runs:
         fi
         echo "Installed $(cibuild --version)"
 
+    - name: Install dependencies
+      shell: bash
+      run: |
+        # Auto-detect pipeline file
+        PIPELINE="${{ inputs.pipeline }}"
+        if [ -z "$PIPELINE" ]; then
+          PIPELINE=$(find .ci/pipelines -name "*.yml" -o -name "*.yaml" 2>/dev/null | head -1)
+        fi
+
+        if [ -n "$PIPELINE" ] && [ -f "$PIPELINE" ]; then
+          # Check if pipeline uses Fastlane-dependent steps
+          if grep -qE '\b(fastlane|app-store-deploy|google-play-deploy)@' "$PIPELINE"; then
+            if ! command -v fastlane &>/dev/null; then
+              echo "Pipeline uses Fastlane-dependent steps — installing Fastlane..."
+              if [ -f "Gemfile" ] && grep -q "fastlane" Gemfile 2>/dev/null; then
+                gem install bundler --no-document
+                bundle install --jobs 4 --retry 3
+              else
+                gem install fastlane --no-document
+              fi
+              echo "Installed $(fastlane --version | head -1)"
+            else
+              echo "Fastlane already available: $(fastlane --version | head -1)"
+            fi
+          fi
+        fi
+
     - name: Run pipeline
       shell: bash
       env:
@@ -47,7 +74,7 @@ runs:
 
         PIPELINE="${{ inputs.pipeline }}"
         if [ -n "$PIPELINE" ]; then
-          if [ \! -f "$PIPELINE" ]; then
+          if [ ! -f "$PIPELINE" ]; then
             echo "::error::Pipeline file not found: $PIPELINE"
             exit 1
           fi
