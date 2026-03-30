@@ -160,11 +160,12 @@ jobs:
 
 The action automatically maps GitHub context to cibuild environment variables (`GIT_BRANCH`, `GIT_COMMIT`, `BUILD_NUMBER`, `BUILD_URL`).
 
-## Example
+## Examples
 
-See [CITestiOS](https://github.com/invarnhq/CITestiOS) for a complete iOS project using cibuild on GitHub Actions:
-
-[![CI](https://github.com/invarnhq/CITestiOS/actions/workflows/ci.yml/badge.svg)](https://github.com/invarnhq/CITestiOS/actions/workflows/ci.yml)
+| Project | Platform | Status |
+|---|---|---|
+| [CITestiOS](https://github.com/invarnhq/CITestiOS) | iOS | [![CI](https://github.com/invarnhq/CITestiOS/actions/workflows/ci.yml/badge.svg)](https://github.com/invarnhq/CITestiOS/actions/workflows/ci.yml) |
+| [CITestAndroid](https://github.com/invarnhq/CITestAndroid) | Android | [![CI](https://github.com/invarnhq/CITestAndroid/actions/workflows/ci.yml/badge.svg)](https://github.com/invarnhq/CITestAndroid/actions/workflows/ci.yml) |
 
 ## Requirements
 
