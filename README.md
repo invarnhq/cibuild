@@ -112,14 +112,13 @@ ci secrets add SLACK_WEBHOOK pipeline.yml -w release
 
 ### Deploy to GitHub
 
-Push all local secrets to a GitHub Environment and sync your workflow in two commands:
+Push all local secrets to a GitHub Environment in one command:
 
 ```bash
 ci secrets upload
-ci secrets sync-workflow .github/workflows/ci.yml
 ```
 
-`upload` pushes every secret to the `cibuild` environment on GitHub. `sync-workflow` adds the required `env:` mappings to your workflow file so the action can read them. Requires [GitHub CLI](https://cli.github.com/) (`gh auth login`).
+This uploads every secret to the `cibuild` environment on GitHub and automatically syncs the `env:` mappings in `.github/workflows/ci.yml`. Requires [GitHub CLI](https://cli.github.com/) (`gh auth login`).
 
 ## GitHub Actions
 
