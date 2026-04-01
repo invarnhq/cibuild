@@ -61,7 +61,7 @@ cibuild works best when you start with `ci init --create` and build on top of th
 
 Tell your AI coding agent:
 
-> Set up and customize CI/CD pipelines for this project using cibuild according to the following spec: https://github.com/invarnhq/cibuild/blob/main/SPEC.md
+> Set up and customize CI/CD pipelines for this project using cibuild according to the following spec: https://raw.githubusercontent.com/invarnhq/cibuild/refs/heads/main/SPEC.md
 
 ### Run
 
