@@ -84,7 +84,9 @@ ci run .ci/pipelines/cibuild.yml -w release    # Run a specific workflow
 | `ci run <path> [-w <name>] --skip-validation` | Skip validation, run with interactive prompts |
 | `ci validate <path> [-w <name>]` | Validate pipeline (alias for --validate-only) |
 | `ci detect-platform <path> [-w <name>]` | Detect platform from YAML pipeline |
+| `ci detect-project` | Detect project type (android, ios, kmm) from the current directory |
 | `ci edit <path> [-w <name>]` | View pipeline and edit step inputs |
+| `ci reset [--force]` | Remove all cibuild files and folders |
 | `ci secrets add <var> <path> [-w <name>]` | Add a secret (prompted interactively) |
 | `ci secrets add <var> <path> --file <file>` | Add a secret from a file |
 | `ci secrets upload [--env <name>]` | Upload secrets to GitHub environment |

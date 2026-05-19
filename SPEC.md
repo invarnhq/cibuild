@@ -115,8 +115,8 @@ Steps produce outputs (environment variables, files) that downstream steps consu
 | Step | Must run after | Reason |
 |------|---------------|--------|
 | `git-clone` | `activate-ssh-key` (if repo is private) | SSH key must be available before git operations |
-| `cache-pull` | `git-clone` (if used) | Needs `CIBUILD_SOURCE_DIR` to resolve cache paths (set automatically when running locally) |
-| `cache-push` | all build/test steps | Must run at end of workflow so caches include build outputs |
+| `cache-pull` | `git-clone` (if used) | Needs `CIBUILD_SOURCE_DIR` to resolve cache paths (set automatically when running locally). Skip manual placement when `meta.cibuild.io.cachedBuild: true` — cibuild injects this step automatically. |
+| `cache-push` | all build/test steps | Must run at end of workflow so caches include build outputs. Skip manual placement when `meta.cibuild.io.cachedBuild: true` — cibuild injects this step automatically. |
 | `app-store-deploy` | `xcode-archive` | Uploads `CIBUILD_IPA_PATH` to App Store Connect via fastlane deliver |
 | `google-play-deploy` | `gradle-build` or `android-build` | Uploads `CIBUILD_APK_PATH` or `CIBUILD_AAB_PATH` to Google Play via fastlane supply |
 | `slack` | all other steps (use `is_always_run: true`) | Notification sent after all work is done |
@@ -206,6 +206,79 @@ When composing a workflow, follow this general ordering:
 | `{{getenv "VAR"}}` | `{{getenv "SCHEME"}}` | Template function |
 | `{{checksum "path"}}` | `{{checksum "Gemfile.lock"}}` | Content-based hash for cache keys |
 
+## 4.1 Pipeline Metadata (`meta`)
+
+Pipelines may declare infrastructure and platform hints under a top-level `meta:` block, keyed by `cibuild.io`:
+
+```yaml
+meta:
+  cibuild.io:
+    stack: macos-xcode-26.4         # Runner image / toolchain (informational)
+    machine_type: standard          # standard | performance
+    machine_type_id: m1-pro         # Specific machine configuration (optional)
+    platform: ios                   # ios | android | kmm | other
+    cachedBuild: true               # Auto-inject cache-pull/cache-push (see below)
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `stack` | string | Runner image / toolchain hint (e.g. `macos-xcode-26.4`, `linux-docker-android-22.04`). |
+| `machine_type` | `standard` \| `performance` | VM performance tier. |
+| `machine_type_id` | string | Specific machine configuration (optional, advanced). |
+| `platform` | `ios` \| `android` \| `kmm` \| `other` | Explicit app-platform declaration. Drives the `cachedBuild` cache technology selection. |
+| `cachedBuild` | boolean | When `true`, cibuild auto-injects a `cache-pull@1.0.0` as the first step and a `cache-push@1.0.0` as the last step. Any manually written `cache-pull`/`cache-push` steps are stripped. The cache `technology` is picked from `platform`: `ios → ios`, `android → gradle`, `kmm → kmm`. |
+
+### Auto-injected caching via `cachedBuild`
+
+The simplest way to add caching to a workflow — no need to add `cache-pull`/`cache-push` steps manually:
+
+```yaml
+meta:
+  cibuild.io:
+    platform: ios
+    cachedBuild: true
+workflows:
+  primary:
+    steps:
+      - cocoapods-install@1.0.0
+      - xcode-archive@1.0.0:
+          inputs:
+            project_path: MyApp.xcworkspace
+            scheme: MyApp
+            distribution_method: app-store
+```
+
+At runtime the workflow above is expanded to:
+
+```yaml
+- cache-pull@1.0.0:
+    inputs: { technology: ios }      # auto-injected (Podfile.lock fallback → Package.resolved)
+- cocoapods-install@1.0.0
+- xcode-archive@1.0.0: { ... }
+- cache-push@1.0.0:
+    inputs: { technology: ios }      # auto-injected
+```
+
+## 4.2 Xcode destinations: `destination: "auto"`
+
+All `xcode-*` steps that accept a `destination` input (`xcodebuild`, `xcode-test`, `xcode-build-for-test`, `xcode-test-without-building`, `xcode-build-for-simulator`) support the literal value `destination: "auto"`.
+
+When set, cibuild shells out to `xcrun simctl list devices available --json` and selects:
+- The highest installed iOS runtime, and
+- The newest available iPhone in that runtime (ties prefer `Pro Max` → `Pro` → plain).
+
+It then constructs the canonical destination string `platform=iOS Simulator,OS=<version>,name=<iPhone N>` and passes it to `xcodebuild`. Literal destination strings (e.g. `platform=iOS Simulator,name=iPhone 15,OS=latest`) pass through unchanged.
+
+```yaml
+- xcode-test@1.0.0:
+    inputs:
+      project_path: MyApp.xcworkspace
+      scheme: MyAppTests
+      destination: "auto"          # resolved at runtime via xcrun simctl
+```
+
+Use `destination: "auto"` in curated templates that need to survive Apple's device-profile renames and Xcode updates. Validation requires `xcrun` only when `destination === "auto"`; literal destinations have no extra requirement.
+
 ## 5. Step Catalog
 
 <!-- BEGIN STEP CATALOG -->
@@ -238,12 +311,12 @@ When composing a workflow, follow this general ordering:
 
 > Restores cached files from previous builds. Uses a cache key for content-based invalidation. Skipped in local mode.
 
-**Agent Notes:** Restores cached files from previous builds. Skipped in local mode. Place early in workflow to restore dependencies. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored — the step auto-detects the lockfile and paths. For custom caching, set cache_key and cache_paths manually.
+**Agent Notes:** Restores cached files from previous builds. Skipped in local mode. Place early in workflow (after git-clone) to restore dependencies. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored — the step auto-detects the lockfile and paths. For custom caching, set cache_key and cache_paths manually.
 
 **Inputs:**
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
-| technology | no | - | Auto-configure cache for a technology: cocoapods, carthage, spm, gradle, npm, yarn, dart |
+| technology | no | - | Auto-configure cache for a technology: ios, cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart |
 | cache_key | no | - | Key used to identify the cache entry (ignored when technology is set) |
 | cache_paths | no | - | Paths to restore from cache (ignored when technology is set) |
 | is_debug_mode | no | `false` | Enable verbose debug logging |
@@ -261,12 +334,12 @@ When composing a workflow, follow this general ordering:
 
 > Saves files to cache for future builds. Supports glob patterns and path identifiers for derived data and build directories. Skipped in local mode.
 
-**Agent Notes:** Saves files to cache for future builds. Skipped in local mode. Place at end of workflow after build succeeds. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored. For custom caching, set cache_key and cache_paths manually. Supports path identifiers: "derived_data:pattern", "builds:pattern".
+**Agent Notes:** Saves files to cache for future builds. Skipped in local mode. Place at end of workflow after build succeeds. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored. For custom caching, set cache_key and cache_paths manually. Supports path identifiers: "derived_data:pattern", "builds:pattern".
 
 **Inputs:**
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
-| technology | no | - | Auto-configure cache for a technology: cocoapods, carthage, spm, gradle, npm, yarn, dart |
+| technology | no | - | Auto-configure cache for a technology: ios, cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart |
 | cache_key | no | - | Key used to identify the cache entry (ignored when technology is set) |
 | cache_paths | no | - | Paths to save to cache (ignored when technology is set, supports glob patterns) |
 | is_debug_mode | no | `false` | Enable verbose debug logging |
@@ -280,15 +353,14 @@ When composing a workflow, follow this general ordering:
 ```
 
 ---
----
 ### fastlane@1.0.0
 **Platform:** All
 
 > Runs a fastlane lane with Gemfile/Bundler detection. Automatically uses bundle exec when a Gemfile with the fastlane gem is detected. Optionally updates the fastlane gem before execution.
 
-**Agent Notes:** Use after any dependency installation steps. The lane input is required. If your Fastfile is not in the repo root, set work_dir to the parent directory of the fastlane directory.
+**Agent Notes:** Use after git-clone and any dependency installation steps. The lane input is required. If your Fastfile is not in the repo root, set work_dir to the parent directory of the fastlane directory.
 
-**Requires:** — (needs source code)
+**Requires:** steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -337,9 +409,9 @@ When composing a workflow, follow this general ordering:
 
 > Builds a Flutter project for iOS, Android, or both. Supports APK, AAB, .app, and .xcarchive output types with configurable build params.
 
-**Agent Notes:** Use after flutter-installer. Set platform to ios, android, or both. For iOS, the build uses --no-codesign by default — use certificate-installer and xcode-archive for signed builds.
+**Agent Notes:** Use after flutter-installer and git-clone. Set platform to ios, android, or both. For iOS, the build uses --no-codesign by default — use certificate-installer and xcode-archive for signed builds.
 
-**Requires:** commands: `flutter` | steps: `flutter-installer`
+**Requires:** commands: `flutter` | steps: `flutter-installer`, `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -394,9 +466,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs flutter test with optional code coverage collection. Exports the coverage file path for downstream steps.
 
-**Agent Notes:** Use after flutter-installer. Enable coverage with generate_code_coverage_files to produce lcov.info.
+**Agent Notes:** Use after flutter-installer and git-clone. Enable coverage with generate_code_coverage_files to produce lcov.info.
 
-**Requires:** commands: `flutter` | steps: `flutter-installer`
+**Requires:** commands: `flutter` | steps: `flutter-installer`, `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -420,9 +492,9 @@ When composing a workflow, follow this general ordering:
 
 > Generates a changelog from git commit history since the last tag. Ignores merge commits. Falls back to all commits if no tags exist.
 
-**Agent Notes:** The changelog is written to a file and exported as CIBUILD_CHANGELOG. Useful before github-release or deploy steps.
+**Agent Notes:** Use after git-clone. The changelog is written to a file and exported as CIBUILD_CHANGELOG. Useful before github-release or deploy steps.
 
-**Requires:** commands: `git`
+**Requires:** commands: `git` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -445,7 +517,7 @@ When composing a workflow, follow this general ordering:
 
 > Detects the local git repository root and exports commit metadata as environment variables. Does not perform an actual clone — assumes the source code is already present on disk.
 
-**Agent Notes:** Does NOT clone — assumes repo already present locally. Detects git root and exports commit metadata (`CIBUILD_SOURCE_DIR`, commit hash, author, etc.). This step is **optional** — `CIBUILD_SOURCE_DIR` is set automatically when running locally or via GitHub Actions. Only include it if you need the exported git metadata (commit hash, author, message) for downstream steps like `slack` or `generate-changelog`.
+**Agent Notes:** Does NOT clone — assumes repo already present locally. Detects git root and exports commit metadata. Should always be the first step in any workflow. All subsequent steps depend on CIBUILD_SOURCE_DIR.
 
 **Requires:** commands: `git`
 
@@ -475,7 +547,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Use after generate-changelog or at the end of a release workflow. Requires GITHUB_TOKEN environment variable or api_token input. Skipped in local mode.
 
-**Requires:** commands: `gh`
+**Requires:** commands: `gh` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -601,9 +673,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs a Carthage command (bootstrap, update, or build) to download and build iOS/macOS dependencies. Supports GitHub access token to avoid rate limits and additional Carthage options.
 
-**Agent Notes:** Use for managing Carthage dependencies. Prefer bootstrap over update for reproducible builds and caching. Pass --platform ios via carthage_options to speed up builds.
+**Agent Notes:** Use for managing Carthage dependencies. Place after git-clone. Prefer bootstrap over update for reproducible builds and caching. Pass --platform ios via carthage_options to speed up builds.
 
-**Requires:** commands: `carthage`
+**Requires:** commands: `carthage` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -627,7 +699,7 @@ When composing a workflow, follow this general ordering:
 
 > Installs Apple code signing certificates (.p12) and provisioning profiles into the macOS keychain for Xcode builds. Supports multiple certificates and profiles via pipe-separated URLs. Handles both remote URLs and local file:// paths.
 
-**Agent Notes:** Use before xcode-archive or any step that requires code signing. Requires certificate_url and keychain_password at minimum. Provisioning profiles are installed to ~/Library/MobileDevice/Provisioning Profiles/.
+**Agent Notes:** Use before xcode-archive or any step that requires code signing. Maps from Bitrise certificate-and-profile-installer step. Requires certificate_url and keychain_password at minimum. Provisioning profiles are installed to ~/Library/MobileDevice/Provisioning Profiles/.
 
 **Requires:** commands: `security`
 
@@ -657,9 +729,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs CocoaPods pod install or pod update to install iOS/macOS dependencies. Auto-detects Gemfile and uses bundle exec when cocoapods gem is present. Determines working directory from source_root_path or CIBUILD_SOURCE_DIR.
 
-**Agent Notes:** Use for installing CocoaPods dependencies. If the project uses a Gemfile with cocoapods, the step automatically runs bundle exec pod install. Use command: update to update all pods.
+**Agent Notes:** Use for installing CocoaPods dependencies. Place after git-clone. If the project uses a Gemfile with cocoapods, the step automatically runs bundle exec pod install. Use command: update to update all pods.
 
-**Requires:** commands: `pod`
+**Requires:** commands: `pod` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -774,7 +846,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Use when you need to directly modify a specific Info.plist file. For project-level versioning via agvtool, prefer set-xcode-build-number. Requires info_plist_file path.
 
-**Requires:** commands: `/usr/libexec/PlistBuddy`
+**Requires:** commands: `/usr/libexec/PlistBuddy` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -802,7 +874,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Use before xcode-archive or xcodebuild to set the build number. Supports build_version_offset for auto-incrementing. Defaults to using $CIBUILD_BUILD_NUMBER if build_version is not set.
 
-**Requires:** commands: `xcodebuild`
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -830,9 +902,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs SwiftLint on the project with configurable reporter, strict mode, and support for linting only changed files.
 
-**Agent Notes:** Use to lint Swift source files. Requires SwiftLint installed (brew install swiftlint). Supports .swiftlint.yml config.
+**Agent Notes:** Use after git-clone to lint Swift source files. Requires SwiftLint installed (brew install swiftlint). Supports .swiftlint.yml config.
 
-**Requires:** commands: `swiftlint`
+**Requires:** commands: `swiftlint` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -861,9 +933,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs the full xcodebuild archive and export flow, producing a signed IPA, an xcarchive, and dSYM files. Handles ExportOptions.plist generation, code-signing configuration, and bitcode settings automatically.
 
-**Agent Notes:** Full archive+export flow. Use after dependency installation steps (cocoapods-install, spm-resolve, etc.). For App Store distribution, set distribution_method to app-store. The step auto-generates ExportOptions.plist unless export_options_plist_content is provided explicitly. Follow with app-store-deploy for App Store / TestFlight uploads, or ota-install for ad-hoc OTA distribution.
+**Agent Notes:** Full archive+export flow. Use after git-clone and dependency installation steps (cocoapods-install, spm-resolve, etc.). For App Store distribution, set distribution_method to app-store. The step auto-generates ExportOptions.plist unless export_options_plist_content is provided explicitly. Follow with app-store-deploy for App Store / TestFlight uploads, or ota-install for ad-hoc OTA distribution.
 
-**Requires:** commands: `xcodebuild`
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -879,6 +951,8 @@ When composing a workflow, follow this general ordering:
 | xcconfig_content | no | `COMPILER_INDEX_STORE_ENABLE = NO` | Extra xcconfig settings applied during archive |
 | xcodebuild_options | no | - | Additional flags passed directly to xcodebuild |
 | export_options_plist_content | no | - | Custom ExportOptions.plist XML content; overrides auto-generation |
+| signing_style | no | `automatic` | Signing style for auto-generated ExportOptions.plist: automatic | manual. Ignored when export_options_plist_content is provided. |
+| provisioning_profiles | no | - | Newline-separated 'bundleId=ProfileName' pairs. Required when signing_style=manual. Reads APPLE_TEAM_ID from env at runtime. |
 | output_dir | no | `build/ipa` | Directory where the IPA, xcarchive, and dSYM are written |
 | artifact_name | no | - | Custom base name for the exported artifacts |
 
@@ -901,9 +975,9 @@ When composing a workflow, follow this general ordering:
 
 > Builds an iOS/tvOS/watchOS app for the simulator using xcodebuild. Produces a .app bundle that can be deployed to a simulator or uploaded to services like Appetize.io for browser-based testing.
 
-**Agent Notes:** Use when you need a simulator .app build (not an IPA). Place after dependency steps. Code signing is disabled by default (CODE_SIGNING_ALLOWED=NO). For device builds, use xcodebuild instead.
+**Agent Notes:** Use when you need a simulator .app build (not an IPA). Place after git-clone and dependency steps. Code signing is disabled by default (CODE_SIGNING_ALLOWED=NO). For device builds, use xcodebuild instead.
 
-**Requires:** commands: `xcodebuild`
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -934,9 +1008,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs xcodebuild build-for-testing to compile the app and its tests without executing them. Produces an .xctestrun file that can be used by xcode-test-without-building to run tests separately, e.g. on a real device or via a third-party testing service.
 
-**Agent Notes:** Use when you want to build tests separately from running them. Produces an .xctestrun file consumed by xcode-test-without-building. Place after dependency steps. Set destination to generic/platform=iOS Simulator for simulator tests or generic/platform=iOS for device tests.
+**Agent Notes:** Use when you want to build tests separately from running them. Produces an .xctestrun file consumed by xcode-test-without-building. Place after git-clone and dependency steps. Set destination to generic/platform=iOS Simulator for simulator tests or generic/platform=iOS for device tests.
 
-**Requires:** commands: `xcodebuild`
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -968,9 +1042,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs xcodebuild test to execute unit tests and UI tests for an Xcode project or workspace. Supports test plans, code coverage collection, and custom simulator destinations.
 
-**Agent Notes:** Use for running unit and UI tests. Runs xcodebuild test. For simulator testing, specify destination with simulator details (platform, device name, OS version). Place after any dependency-installation steps. This step does not produce build artifacts; use xcodebuild or xcode-archive for that purpose.
+**Agent Notes:** Use for running unit and UI tests. Runs xcodebuild test. For simulator testing, specify destination with simulator details (platform, device name, OS version). Place after git-clone and any dependency-installation steps. This step does not produce build artifacts; use xcodebuild or xcode-archive for that purpose.
 
-**Requires:** commands: `xcodebuild`
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1028,9 +1102,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs xcodebuild to compile an Xcode project or workspace without producing an archive or exportable artifact. Useful for verifying that the project builds successfully, running incremental builds during development, or as a prerequisite step before ios-archive.
 
-**Agent Notes:** Use for building without archiving. For creating a distributable IPA, use xcode-archive instead. Place after any dependency-installation steps (e.g. cocoapods-install, spm-resolve). The step invokes xcodebuild build, so it does not produce an .xcarchive or IPA.
+**Agent Notes:** Use for building without archiving. For creating a distributable IPA, use xcode-archive instead. Place after git-clone and any dependency-installation steps (e.g. cocoapods-install, spm-resolve). The step invokes xcodebuild build, so it does not produce an .xcarchive or IPA.
 
-**Requires:** commands: `xcodebuild`
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1061,7 +1135,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Alternative to gradle-build that accepts higher-level inputs (variant, module, build_type) instead of direct gradle_task. Same executor as gradle-build under the hood.
 
-**Requires:** steps: `set-java-version`
+**Requires:** steps: `git-clone`, `set-java-version`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1091,9 +1165,9 @@ When composing a workflow, follow this general ordering:
 
 > Builds both the app APK and the test APK for Android instrumented (UI) tests. Runs assembleVariant and assembleVariantAndroidTest gradle tasks.
 
-**Agent Notes:** Use when you need both an app APK and a test APK for running instrumented tests (e.g. via Firebase Test Lab or a connected device). Place after set-java-version.
+**Agent Notes:** Use when you need both an app APK and a test APK for running instrumented tests (e.g. via Firebase Test Lab or a connected device). Place after set-java-version and git-clone.
 
-**Requires:** steps: `set-java-version`
+**Requires:** steps: `git-clone`, `set-java-version`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1121,7 +1195,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Runs Android lint checks via Gradle. Add to PR workflows for code quality.
 
-**Requires:** commands: `java` | steps: `set-java-version`
+**Requires:** commands: `java` | steps: `git-clone`, `set-java-version`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1147,7 +1221,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Runs Android unit tests via Gradle. Add to PR and primary workflows. test_filter accepts Gradle test filter pattern (e.g. "com.example.MyTest").
 
-**Requires:** commands: `java` | steps: `set-java-version`
+**Requires:** commands: `java` | steps: `git-clone`, `set-java-version`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1199,7 +1273,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Updates versionCode/versionName in build.gradle via sed before build. Supports Kotlin DSL (.kts) auto-detection. version_code_offset can increment from current value. Place before gradle-build.
 
-**Requires:** — (needs source code)
+**Requires:** steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1226,9 +1300,9 @@ When composing a workflow, follow this general ordering:
 
 > Runs detekt Kotlin static analysis via the Gradle detekt task. Supports module-level and project-level analysis with additional Gradle arguments.
 
-**Agent Notes:** Use after set-java-version. Requires the detekt Gradle plugin configured in the project.
+**Agent Notes:** Use after git-clone and set-java-version. Requires the detekt Gradle plugin configured in the project. Maps from Bitrise android-detekt step.
 
-**Requires:** steps: `set-java-version`
+**Requires:** steps: `git-clone`, `set-java-version`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1293,7 +1367,7 @@ When composing a workflow, follow this general ordering:
 
 **Agent Notes:** Builds Android project with Gradle. Auto-detects and makes gradlew executable. Locates and exports APK/AAB paths after build. Use set-java-version before this step.
 
-**Requires:** steps: `set-java-version`
+**Requires:** steps: `git-clone`, `set-java-version`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1320,9 +1394,9 @@ When composing a workflow, follow this general ordering:
 
 > Verifies and auto-detects ANDROID_HOME, makes gradlew executable, and validates that Gradle works correctly. Ensures the Android build environment is properly configured.
 
-**Agent Notes:** Verifies/auto-detects ANDROID_HOME, makes gradlew executable, validates Gradle works. Place after set-java-version, before gradle-build.
+**Agent Notes:** Verifies/auto-detects ANDROID_HOME, makes gradlew executable, validates Gradle works. Place after git-clone and set-java-version, before gradle-build.
 
-**Requires:** — (needs source code)
+**Requires:** steps: `git-clone`
 
 **Inputs:**
 | Name | Required | Default | Description |
@@ -1399,14 +1473,16 @@ When composing a workflow, follow this general ordering:
 
 ### iOS CI Workflow
 
-Full iOS pipeline with dependency caching, CocoaPods, testing, archiving, and deployment:
+Full iOS pipeline with auto-injected caching (via `cachedBuild`), CocoaPods, testing, archiving, and deployment. The `destination: "auto"` value picks the newest installed iPhone simulator at runtime:
 
 ```yaml
 format_version: '1'
 meta:
   cibuild.io:
-    stack: macos-ventura-xcode-15.1
+    stack: macos-xcode-26.4
     machine_type: standard
+    platform: ios
+    cachedBuild: true               # auto-injects cache-pull/cache-push (technology: ios)
 app:
   envs:
     - WORKSPACE_PATH: MyApp.xcworkspace
@@ -1415,24 +1491,18 @@ workflows:
   primary:
     steps:
       - activate-ssh-key@1.0.0
-      - cache-pull@1.0.0:
-          inputs:
-            technology: cocoapods
       - cocoapods-install@1.0.0
       - xcode-test@1.0.0:
           inputs:
             project_path: $WORKSPACE_PATH
             scheme: $SCHEME
-            destination: "platform=iOS Simulator,name=iPhone 15,OS=latest"
+            destination: "auto"
       - xcode-archive@1.0.0:
           inputs:
             project_path: $WORKSPACE_PATH
             scheme: $SCHEME
             distribution_method: app-store
       - app-store-deploy@1.0.0
-      - cache-push@1.0.0:
-          inputs:
-            technology: cocoapods
       - slack@1.0.0:
           is_always_run: true
           inputs:
@@ -1481,7 +1551,7 @@ Lint, test, and build for review — with CocoaPods caching and QR code for test
 
 ### iOS Release Workflow
 
-Version bump, code signing, archive, and App Store upload:
+Version bump, manual code signing, archive, and App Store upload. The `signing_style: manual` + `provisioning_profiles` inputs produce an ExportOptions.plist with explicit profile-to-bundle-id mappings:
 
 ```yaml
   release:
@@ -1498,15 +1568,20 @@ Version bump, code signing, archive, and App Store upload:
             keychain_password: "$KEYCHAIN_PASSWORD"
       - set-xcode-build-number@1.0.0:
           inputs:
-            plist_path: MyApp/Info.plist
-            bundle_version_short: "$VERSION_NUMBER"
-            bundle_version: "$CIBUILD_BUILD_NUMBER"
+            project_path: MyApp.xcworkspace
+            scheme: $SCHEME
+            build_short_version_string: "$VERSION_NUMBER"
+            build_version: "$CIBUILD_BUILD_NUMBER"
       - xcode-archive@1.0.0:
           inputs:
             project_path: $WORKSPACE_PATH
             scheme: $SCHEME
             distribution_method: app-store
             automatic_code_signing: "off"
+            signing_style: "manual"
+            provisioning_profiles: |
+              com.example.MyApp=MyApp AppStore
+              com.example.MyApp.NotificationService=MyApp NSE AppStore
       - app-store-deploy@1.0.0:
           inputs:
             api_key_id: "$APPLE_API_KEY_ID"
@@ -1532,26 +1607,28 @@ Build test bundle once, run on multiple simulators in parallel:
     steps:
       - xcode-test-without-building@1.0.0:
           inputs:
-            xctestrun_path: "$CIBUILD_XCTESTRUN_PATH"
-            destination: "platform=iOS Simulator,name=iPhone 15,OS=latest"
+            xctestrun: "$CIBUILD_XCTESTRUN_FILE_PATH"
+            destination: "auto"
 
   test-ipad:
     steps:
       - xcode-test-without-building@1.0.0:
           inputs:
-            xctestrun_path: "$CIBUILD_XCTESTRUN_PATH"
+            xctestrun: "$CIBUILD_XCTESTRUN_FILE_PATH"
             destination: "platform=iOS Simulator,name=iPad Pro (12.9-inch),OS=latest"
 ```
 
 ### Android CI Workflow
 
-Full Android pipeline with Gradle caching, lint, unit tests, and deployment:
+Full Android pipeline with auto-injected Gradle caching (via `cachedBuild`), lint, unit tests, and deployment:
 
 ```yaml
 format_version: '1'
 meta:
   cibuild.io:
     stack: linux-docker-android-22.04
+    platform: android
+    cachedBuild: true               # auto-injects cache-pull/cache-push (technology: gradle)
 app:
   envs:
     - PROJECT_LOCATION: .
@@ -1561,9 +1638,6 @@ workflows:
   primary:
     steps:
       - activate-ssh-key@1.0.0
-      - cache-pull@1.0.0:
-          inputs:
-            technology: gradle
       - set-java-version@1.0.0:
           inputs:
             java_version: "17"
@@ -1586,9 +1660,6 @@ workflows:
           inputs:
             package_name: com.example.myapp
             track: internal
-      - cache-push@1.0.0:
-          inputs:
-            technology: gradle
       - slack@1.0.0:
           is_always_run: true
           inputs:
@@ -1688,7 +1759,7 @@ Full Flutter pipeline: install SDK, test with coverage, build for both platforms
 format_version: '1'
 meta:
   cibuild.io:
-    stack: macos-ventura-xcode-15.1
+    stack: macos-xcode-26.4
 app:
   envs:
     - FLUTTER_PROJECT: .
@@ -1758,8 +1829,9 @@ Dual-build: App Store release for TestFlight + development build for testers:
       - cocoapods-install@1.0.0
       - set-xcode-build-number@1.0.0:
           inputs:
-            plist_path: MyApp/Info.plist
-            bundle_version: "$CIBUILD_BUILD_NUMBER"
+            project_path: $WORKSPACE_PATH
+            scheme: $SCHEME
+            build_version: "$CIBUILD_BUILD_NUMBER"
       - xcode-archive@1.0.0:
           title: "Archive for App Store"
           inputs:
