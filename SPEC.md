@@ -928,6 +928,34 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ```
 
 ---
+### ui-fidelity-render@1.0.0
+**Platform:** iOS
+
+> Renders parameterless SwiftUI views from a SwiftPM package to PNGs using SwiftUI's ImageRenderer on a macOS runner — no app build, no simulator. Screens and their reference images are read at runtime from .ci/inputs/params.json ({ "screens": { "<ViewTypeName>": "<referenceFileBasename>" } }); reference files live at .ci/inputs/<basename>.
+
+**Agent Notes:** Requires the Swift toolchain on the runner. The step synthesizes a throwaway SwiftPM harness with one executable target per screen, so a broken screen (unknown view type, unavailable init) fails alone with a structured VIEW_COMPILE_FAILED error while other screens still render; a package that does not build for macOS marks every screen RENDER_UNSUPPORTED. Outputs inside the artifacts dir: ui-fidelity/rendered/<Screen>.png, ui-fidelity/references/<Screen>.png (one copy per screen, even for shared references), and protocol-result.json (renderer "imagerenderer-spm", one entry per screen in params.json order, relative paths only; always written, even on failure — with an empty screens array when params.json is absent or malformed). Exit code is non-zero iff any screen is not "rendered"; an empty screens object therefore exits zero.
+
+**Requires:** commands: `swift` | steps: `git-clone`
+
+**Inputs:**
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| package_path | yes | - | Path to the user's SwiftPM package containing the screens |
+| target | yes | - | SPM library product to import in the render harness |
+| render_size | no | `393x852` | Render size in device points, "<width>x<height>" |
+| scale | no | `2` | Display scale factor applied to the render |
+
+**Example:**
+```yaml
+- ui-fidelity-render@1.0.0:
+    inputs:
+      package_path: "./MyAppPackage"
+      target: "MyAppViews"
+      render_size: "393x852"
+      scale: 2
+```
+
+---
 ### xcode-archive@1.0.0
 **Platform:** iOS
 
