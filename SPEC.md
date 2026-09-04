@@ -515,28 +515,25 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ### git-clone@1.0.0
 **Platform:** All
 
-> Detects the local git repository root and exports commit metadata as environment variables. Does not perform an actual clone — assumes the source code is already present on disk.
+> Locates the source checkout already on disk and records its commit as environment variables. Does not perform a clone — on a runner the dispatched commit is checked out before any step runs; locally it is your working copy.
 
-**Agent Notes:** Does NOT clone — assumes repo already present locally. Detects git root and exports commit metadata. Should always be the first step in any workflow. All subsequent steps depend on CIBUILD_SOURCE_DIR.
+**Agent Notes:** Does NOT clone and is OPTIONAL. Every variable it exports is already set by cibuild at startup from the same checkout (CIBUILD_SOURCE_DIR, CIBUILD_GIT_COMMIT and the GIT_CLONE_COMMIT_* family), and every step that uses CIBUILD_SOURCE_DIR falls back to the current directory. Include it only if you want the commit hash, author and subject echoed near the top of the build log. All inputs are ignored — do not set them. On a runner the checkout is always shallow (depth 1) with no submodules, LFS or tags; that is a runner property, not something this step can change.
 
 **Requires:** commands: `git`
 
 **Inputs:**
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
-| repository | no | `$GIT_REPOSITORY_URL` | Git repository URL (informational; no clone is performed) |
-| branch | no | `$GIT_BRANCH or main` | Branch to check out or verify |
-| clone_depth | no | `0` | Shallow clone depth (0 = full history) |
-| clone_into_dir | no | `.` | Directory that contains the repository |
+| repository | no | `$GIT_REPOSITORY_URL` | Ignored — no clone is performed; the checkout already exists |
+| branch | no | `$GIT_BRANCH or main` | Ignored — on a runner the dispatched ref is checked out, not this value |
+| clone_depth | no | `0` | Ignored — no clone is performed; a runner checkout is always depth 1 |
+| clone_into_dir | no | `.` | Ignored — the checkout location is not chosen by this step |
 
 **Outputs:** `CIBUILD_SOURCE_DIR`, `GIT_CLONE_COMMIT_HASH`, `CIBUILD_GIT_COMMIT`, `GIT_CLONE_COMMIT_AUTHOR_NAME`, `GIT_CLONE_COMMIT_AUTHOR_EMAIL`, `GIT_CLONE_COMMIT_COMMITER_NAME`, `GIT_CLONE_COMMIT_COMMITER_EMAIL`, `GIT_CLONE_COMMIT_MESSAGE_SUBJECT`, `GIT_CLONE_COMMIT_MESSAGE_BODY`
 
 **Example:**
 ```yaml
-- git-clone@1.0.0:
-    inputs:
-      branch: main
-      clone_into_dir: "."
+- git-clone@1.0.0: {}
 ```
 
 ---
