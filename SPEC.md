@@ -344,6 +344,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | cache_paths | no | - | Paths to save to cache (ignored when technology is set, supports glob patterns) |
 | is_debug_mode | no | `false` | Enable verbose debug logging |
 | ignore_check_on_paths | no | `false` | Skip change detection and always push cache |
+| skip_on_exact_hit | no | `false` | With cache_key, over the cache daemon: skip the push when a cache-pull earlier in this build restored exactly this key. Leave off for caches that grow during the build (Gradle) |
 
 **Example:**
 ```yaml
