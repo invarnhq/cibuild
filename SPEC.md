@@ -319,6 +319,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | technology | no | - | Auto-configure cache for a technology: ios, cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart |
 | cache_key | no | - | Key used to identify the cache entry (ignored when technology is set) |
 | cache_paths | no | - | Paths to restore from cache (ignored when technology is set) |
+| fallback_key_prefixes | no | - | With cache_key: when the exact key misses, restore the newest cache of this project whose key starts with one of these prefixes (a string or a list, tried in order; a prefix ends at a '-'). A fallback restore is not an exact hit for cache-push's skip_on_exact_hit |
 | is_debug_mode | no | `false` | Enable verbose debug logging |
 
 **Example:**
