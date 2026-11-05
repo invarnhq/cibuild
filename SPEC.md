@@ -306,16 +306,17 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ```
 
 ---
-### cache-pull@1.0.0
+### cache-pull@1.1.0
 **Platform:** All
 
 > Restores cached files from previous builds. Uses a cache key for content-based invalidation. Skipped in local mode.
 
-**Agent Notes:** Restores cached files from previous builds. Skipped in local mode. Place early in workflow (after git-clone) to restore dependencies. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored — the step auto-detects the lockfile and paths. For custom caching, set cache_key and cache_paths manually.
+**Agent Notes:** Restores cached files from previous builds. Skipped in local mode. Place early in workflow (after git-clone) to restore dependencies. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored — the step auto-detects the lockfile and paths. For custom caching, set cache_key and cache_paths manually. To restore several caches in one step, list them under caches, each with its own cache_key, cache_paths and fallback_key_prefixes; caches is not combined with cache_key or technology. Each cache prints its own outcome line, in list order, and one cache that fails does not stop the others.
 
 **Inputs:**
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
+| caches | no | - | Several caches in one step, restored in list order: a list of maps, each with its own cache_key, cache_paths and fallback_key_prefixes (exactly the single-cache inputs). Not combined with cache_key or technology. An entry whose cache_key checksums a file the repository lacks is dropped; the step is skipped only when no entry is left |
 | technology | no | - | Auto-configure cache for a technology: ios, cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart |
 | cache_key | no | - | Key used to identify the cache entry (ignored when technology is set) |
 | cache_paths | no | - | Paths to restore from cache (ignored when technology is set) |
@@ -324,22 +325,34 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 **Example:**
 ```yaml
-- cache-pull@1.0.0:
+- cache-pull@1.1.0:
     inputs:
       technology: cocoapods
+- cache-pull@1.1.0:
+    inputs:
+      caches:
+        - cache_key: sourcepackages-$CIBUILD_STACK-{{checksum "$SPM_RESOLVED_PATH"}}
+          fallback_key_prefixes:
+            - sourcepackages-$CIBUILD_STACK
+          cache_paths:
+            - ~/Library/Developer/cibuild/cibuild-derived-data/build-app/SourcePackages
+        - cache_key: compilecache-$CIBUILD_STACK
+          cache_paths:
+            - ~/Library/Developer/cibuild/compilation-cache
 ```
 
 ---
-### cache-push@1.0.0
+### cache-push@1.1.0
 **Platform:** All
 
 > Saves files to cache for future builds. Supports glob patterns and path identifiers for derived data and build directories. Skipped in local mode.
 
-**Agent Notes:** Saves files to cache for future builds. Skipped in local mode. Place at end of workflow after build succeeds. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored. For custom caching, set cache_key and cache_paths manually. Supports path identifiers: "derived_data:pattern", "builds:pattern".
+**Agent Notes:** Saves files to cache for future builds. Skipped in local mode. Place at end of workflow after build succeeds. Use the technology input for automatic configuration (cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart). When technology is set, cache_key and cache_paths are ignored. For custom caching, set cache_key and cache_paths manually. Supports path identifiers: "derived_data:pattern", "builds:pattern". To save several caches in one step, list them under caches, each with its own cache_key, cache_paths, skip_on_exact_hit and ignore_check_on_paths; caches is not combined with cache_key or technology. skip_on_exact_hit is decided per cache: only the caches whose own key was an exact hit are skipped.
 
 **Inputs:**
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
+| caches | no | - | Several caches in one step, saved in list order: a list of maps, each with its own cache_key, cache_paths, skip_on_exact_hit and ignore_check_on_paths (fallback_key_prefixes is accepted and ignored, so one list serves both steps). Not combined with cache_key or technology |
 | technology | no | - | Auto-configure cache for a technology: ios, cocoapods, carthage, spm, gradle, kmm, npm, yarn, dart |
 | cache_key | no | - | Key used to identify the cache entry (ignored when technology is set) |
 | cache_paths | no | - | Paths to save to cache (ignored when technology is set, supports glob patterns) |
@@ -349,9 +362,17 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 **Example:**
 ```yaml
-- cache-push@1.0.0:
+- cache-push@1.1.0:
     inputs:
       technology: cocoapods
+- cache-push@1.1.0:
+    inputs:
+      caches:
+        - cache_key: sourcepackages-$CIBUILD_STACK-{{checksum "$SPM_RESOLVED_PATH"}}
+          skip_on_exact_hit: true
+          cache_paths: [ ~/Library/Developer/cibuild/cibuild-derived-data/build-app/SourcePackages ]
+        - cache_key: compilecache-$CIBUILD_STACK
+          cache_paths: [ ~/Library/Developer/cibuild/compilation-cache ]
 ```
 
 ---
