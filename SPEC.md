@@ -1024,7 +1024,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 > Builds an iOS/tvOS/watchOS app for the simulator using xcodebuild. Produces a .app bundle that can be deployed to a simulator or uploaded to services like Appetize.io for browser-based testing.
 
-**Agent Notes:** Use when you need a simulator .app build (not an IPA). Place after git-clone and dependency steps. Code signing is disabled by default (CODE_SIGNING_ALLOWED=NO). For device builds, use xcodebuild instead.
+**Agent Notes:** Use when you need a simulator .app build (not an IPA). Place after git-clone and dependency steps. For a simulator destination the app is ad-hoc signed by default (CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO), which needs no team, certificate or profile and keeps its entitlements, so keychain access groups and app groups work on the simulator. Any other destination builds with CODE_SIGNING_ALLOWED=NO. For device builds, use xcodebuild instead.
 
 **Requires:** commands: `xcodebuild` | steps: `git-clone`
 
@@ -1036,7 +1036,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | configuration | no | - | Build configuration (e.g. Debug) |
 | destination | no | `generic/platform=iOS Simulator` | Simulator destination specifier |
 | perform_clean_action | no | `no` | Run clean before build (yes/no) |
-| xcconfig_content | no | `CODE_SIGNING_ALLOWED=NO` | Extra xcconfig settings (default disables code signing) |
+| xcconfig_content | no | - | Extra xcconfig settings. Given, they replace the default: ad-hoc signing (CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO) for a simulator destination, CODE_SIGNING_ALLOWED=NO for any other |
 | xcodebuild_options | no | - | Additional xcodebuild flags |
 | output_dir | no | `build` | Directory for build artifacts |
 
