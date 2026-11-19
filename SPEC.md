@@ -131,6 +131,8 @@ Steps produce outputs (environment variables, files) that downstream steps consu
 | `carthage` | — (needs source code) | Reads `Cartfile` from repo |
 | `swiftlint` | — (needs source code) | Reads Swift source files from repo |
 | `certificate-installer` | — (no step deps) | Installs certs into macOS keychain; run before any signing step |
+| `ios-build-number` | — (needs source code) | Publishes `CIBUILD_ARCHIVE_BUILD_NUMBER` (App Store Connect's highest plus one, or a given number); run before `xcode-archive`, which hands it to Xcode as `CURRENT_PROJECT_VERSION`. Edits no file |
+| `ios-resign` | `certificate-installer`, and an ipa (`xcode-archive` or a given path) | Signs the ipa again with installed profiles, nested targets first; writes the new ipa to the deploy folder as `CIBUILD_RESIGNED_IPA_PATH` |
 | `set-xcode-build-number` | — (needs source code) | Modifies `Info.plist` in repo; run before `xcode-archive` |
 | `set-ios-version` | — (needs source code) | Modifies `Info.plist` in repo; run before `xcode-archive` |
 | `xcodebuild` | dependency step (`cocoapods-install` or `carthage` if used) | Needs source code and resolved dependencies |
@@ -138,7 +140,7 @@ Steps produce outputs (environment variables, files) that downstream steps consu
 | `xcode-build-for-test` | dependency step if used | Produces `.xctestrun` bundle |
 | `xcode-test-without-building` | `xcode-build-for-test` | Consumes `CIBUILD_XCTESTRUN_PATH` and `CIBUILD_TEST_BUNDLE_DIR` |
 | `xcode-build-for-simulator` | dependency step if used | Produces `.app` for simulator |
-| `xcode-archive` | dependency step if used, `certificate-installer` (if manual signing), `set-xcode-build-number` (if versioning) | Produces `CIBUILD_IPA_PATH`, `CIBUILD_XCARCHIVE_PATH`, `CIBUILD_DSYM_PATH` |
+| `xcode-archive` | dependency step if used, `certificate-installer` (if manual signing), `set-xcode-build-number` or `ios-build-number` (if versioning) | Produces `CIBUILD_IPA_PATH`, `CIBUILD_XCARCHIVE_PATH`, `CIBUILD_DSYM_PATH` |
 | `export-xcarchive` | `xcode-archive` (or any step producing `.xcarchive`) | Consumes `CIBUILD_XCARCHIVE_PATH`, exports IPA |
 | `ios-archive` | `xcodebuild` | Packages `.app` into IPA |
 | `app-store-deploy` | `xcode-archive` | Uploads `CIBUILD_IPA_PATH` to App Store Connect |
@@ -187,7 +189,7 @@ When composing a workflow, follow this general ordering:
 4. Environment setup (`set-java-version`, `flutter-installer`)
 5. Dependency installation (`cocoapods-install`, `carthage`, `install-missing-android-tools`)
 6. Linting (`swiftlint`, `android-lint`, `detekt`)
-7. Version management (`set-xcode-build-number`, `set-ios-version`, `change-android-versioncode-and-versionname`)
+7. Version management (`ios-build-number`, `set-xcode-build-number`, `set-ios-version`, `change-android-versioncode-and-versionname`)
 8. Code signing setup (`certificate-installer`, `file` for keystores)
 9. Testing (`xcode-test`, `android-unit-test`, `flutter-test`)
 10. Build / Archive (`xcode-archive`, `gradle-build`, `flutter-build`)
@@ -650,12 +652,12 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ```
 
 ---
-### app-store-deploy@1.0.0
+### app-store-deploy@1.1.0
 **Platform:** iOS
 
-> Uploads an IPA to App Store Connect or TestFlight using fastlane deliver. Requires Apple API key credentials for authentication. Automatically skipped when running in local mode.
+> Uploads an IPA to App Store Connect or TestFlight using fastlane deliver. Requires Apple API key credentials for authentication. Never prompts and never waits for Apple's processing. After a successful upload it prints one result line with the version, build number, bundle id and the app's App Store Connect id. Automatically skipped when running in local mode.
 
-**Agent Notes:** Uploads IPA to App Store Connect / TestFlight using fastlane deliver. Requires Apple API key credentials (APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_PATH as secrets). Use after xcode-archive. Skipped automatically in local mode since App Store uploads are not meaningful outside CI.
+**Agent Notes:** Uploads IPA to App Store Connect / TestFlight using fastlane deliver. Requires Apple API key credentials (APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_PATH as secrets). Use after xcode-archive. Skipped automatically in local mode since App Store uploads are not meaningful outside CI. The upload is non-interactive (--force, nothing on stdin) and does not wait for processing unless submit_for_review is yes. After a successful upload the log carries one line `▸ INVARN_APP_STORE_UPLOAD:{"status":"uploaded","version":"…","build_number":"…","bundle_id":"…","app_id":"…"}`; version and build number are read from the ipa's main app, and app_id is the app_id input or $APP_STORE_APP_ID, else looked up once by bundle id with the same API key (its TestFlight page is https://appstoreconnect.apple.com/apps/<app_id>/testflight). Any field that cannot be read is left out; a failed lookup never fails the step. A failed upload prints no such line and fails the step with fastlane's reason in the log.
 
 **Requires:** commands: `fastlane` | steps: `xcode-archive`
 
@@ -667,8 +669,8 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | api_issuer | no | - | App Store Connect API Issuer ID |
 | api_key_path | no | - | Path to the .p8 private key file for App Store Connect API |
 | team_id | no | - | Apple Developer team ID |
-| app_id | no | - | App Store Connect app ID |
-| bundle_id | no | - | App bundle identifier (e.g. com.example.MyApp) |
+| app_id | no | - | App Store Connect app ID; defaults to $APP_STORE_APP_ID, else looked up by bundle id after the upload |
+| bundle_id | no | - | App bundle identifier (e.g. com.example.MyApp); defaults to $APP_BUNDLE_ID, else read from the ipa |
 | platform | no | `ios` | Platform to upload for (ios, appletvos, osx) |
 | skip_metadata | no | `yes` | Skip uploading metadata (yes/no) |
 | skip_screenshots | no | `yes` | Skip uploading screenshots (yes/no) |
@@ -678,7 +680,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 **Example:**
 ```yaml
-- app-store-deploy@1.0.0:
+- app-store-deploy@1.1.0:
     inputs:
       ipa_path: build/ipa/MyApp.ipa
       api_key_id: "ABC123"
@@ -714,33 +716,36 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ```
 
 ---
-### certificate-installer@1.0.0
+### certificate-installer@1.1.0
 **Platform:** iOS
 
-> Installs Apple code signing certificates (.p12) and provisioning profiles into the macOS keychain for Xcode builds. Supports multiple certificates and profiles via pipe-separated URLs. Handles both remote URLs and local file:// paths.
+> Installs Apple code signing certificates (.p12) and provisioning profiles into a macOS keychain for Xcode builds. Each certificate and profile may be given as base64 contents, as a plain local path, as a file:// path or as a link; several are allowed. By default the step creates its own temporary keychain and adds it to the keychain search list without making it the default keychain.
 
-**Agent Notes:** Use before xcode-archive or any step that requires code signing. Maps from Bitrise certificate-and-profile-installer step. Requires certificate_url and keychain_password at minimum. Provisioning profiles are installed to ~/Library/MobileDevice/Provisioning Profiles/.
+**Agent Notes:** Use before xcode-archive or any step that requires code signing. Maps from Bitrise certificate-and-profile-installer step. Base64 contents are written into the script and decoded on the machine: no download and no file step. Certificates are installed base64 ones first, then certificate_url ones, and certificate_passphrase is matched to them in that order. provisioning_profiles_base64 takes one profile per line. An input that is left out is read from the variable its description names when the pipeline has it, and is otherwise empty; nothing is installed when nothing is given. Provisioning profiles are installed to ~/Library/MobileDevice/Provisioning Profiles/. The keychain used is exported as CIBUILD_KEYCHAIN_PATH.
 
 **Requires:** commands: `security`
 
 **Inputs:**
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
-| certificate_url | no | `$CIBUILD_CERTIFICATE_URL` | URL(s) to .p12 certificate files (pipe-separated). Supports file:// |
-| certificate_passphrase | no | `$CIBUILD_CERTIFICATE_PASSPHRASE` | Certificate passphrase(s), pipe-separated to match certificate_url count |
-| provisioning_profile_url | no | `$CIBUILD_PROVISION_URL` | URL(s) to provisioning profile files (pipe-separated). Supports file:// |
-| keychain_path | no | `$HOME/Library/Keychains/login.keychain` | Path to the keychain to use |
-| keychain_password | no | `$CIBUILD_KEYCHAIN_PASSWORD` | Password for the keychain |
+| certificate_base64 | no | - | Base64 contents of .p12 certificate(s), pipe-separated; read from $IOS_SIGNING_CERTIFICATE_BASE64 when left out |
+| certificate_url | no | - | Certificate file(s), pipe-separated: a link, a file:// path or a plain local path; read from $CIBUILD_CERTIFICATE_URL when left out |
+| certificate_passphrase | no | - | Certificate passphrase(s), pipe-separated: base64 certificates first, then certificate_url ones; read from $CIBUILD_CERTIFICATE_PASSPHRASE, else $IOS_SIGNING_CERTIFICATE_PASSWORD, when left out |
+| provisioning_profiles_base64 | no | - | Base64 contents of provisioning profiles, one profile per line; read from $IOS_SIGNING_PROFILES_BASE64 when left out |
+| provisioning_profile_url | no | - | Provisioning profile file(s), pipe-separated: a link, a file:// path or a plain local path; read from $CIBUILD_PROVISION_URL when left out |
+| keychain_path | no | - | Keychain to install into; when left out, a new temporary keychain |
+| keychain_password | no | - | Keychain password; read from $CIBUILD_KEYCHAIN_PASSWORD when left out, else a random one |
 | verbose | no | `false` | Enable verbose logging |
+
+**Outputs:** `CIBUILD_KEYCHAIN_PATH`
 
 **Example:**
 ```yaml
-- certificate-installer@1.0.0:
+- certificate-installer@1.1.0:
     inputs:
-      certificate_url: "$CIBUILD_CERTIFICATE_URL"
-      certificate_passphrase: "$CIBUILD_CERTIFICATE_PASSPHRASE"
-      provisioning_profile_url: "$CIBUILD_PROVISION_URL"
-      keychain_password: "$CIBUILD_KEYCHAIN_PASSWORD"
+      certificate_base64: "$IOS_SIGNING_CERTIFICATE_BASE64"
+      certificate_passphrase: "$IOS_SIGNING_CERTIFICATE_PASSWORD"
+      provisioning_profiles_base64: "$IOS_SIGNING_PROFILES_BASE64"
 ```
 
 ---
@@ -773,7 +778,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ### export-xcarchive@1.0.0
 **Platform:** iOS
 
-> Exports an IPA from an existing .xcarchive file using xcodebuild -exportArchive. Supports development, app-store, ad-hoc, and enterprise distribution methods.
+> Exports an IPA from an existing .xcarchive file using xcodebuild -exportArchive. Supports development, app-store, ad-hoc, and enterprise distribution methods; Xcode is sent their current names (debugging, app-store-connect, release-testing), which are accepted as input too.
 
 **Agent Notes:** Use after xcode-archive or any step that produces a .xcarchive. Allows creating multiple IPA exports from the same archive with different distribution methods. Automatic code signing is not supported — use certificate-installer before this step.
 
@@ -784,7 +789,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 |------|----------|---------|-------------|
 | archive_path | yes | `$CIBUILD_XCARCHIVE_PATH` | Path to .xcarchive file |
 | product | no | `app` | Product to export: app | app-clip |
-| distribution_method | no | `development` | Export method: development | app-store | ad-hoc | enterprise |
+| distribution_method | no | `development` | Export method: development | ad-hoc | app-store | enterprise, or the current names debugging | release-testing | app-store-connect. Xcode is always sent the current name. |
 | compile_bitcode | no | `yes` | Recompile from bitcode for non-App Store (yes/no) |
 | upload_bitcode | no | `yes` | Include bitcode for App Store (yes/no) |
 | export_options_plist_content | no | - | Custom ExportOptions.plist content (overrides generated plist) |
@@ -826,12 +831,85 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ```
 
 ---
+### ios-build-number@1.0.0
+**Platform:** iOS
+
+> Sets the build number the archive gets, from one of two sources: the next number after the highest one already uploaded to App Store Connect for the app's current version, or a number it is given. Off by default. No project file is edited and the marketing version is never changed: the number is handed to xcode-archive, which passes it to Xcode as the CURRENT_PROJECT_VERSION build setting, so projects with a generated Info.plist get it too.
+
+**Agent Notes:** Place before xcode-archive. Nothing happens unless source is set: source off (default) leaves the project's own build number. source app-store-connect reads the app target's bundle id and version from the project's build settings (project_path, scheme, configuration; a version written plainly in the Info.plist wins over MARKETING_VERSION), asks App Store Connect with the API key app-store-deploy uses (APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_PATH) for every build uploaded for that version, and uses the next number after the highest (1 when none; a dotted number goes up in its last part). Any failed lookup stops the step with a plain message and never guesses. It is not asked in local mode. source given uses build_number as it is (default $CIBUILD_BUILD_NUMBER, the build's own number). An Info.plist that writes CFBundleVersion as a plain number rather than $(CURRENT_PROJECT_VERSION) keeps that number.
+
+**Requires:** commands: `xcodebuild` | steps: `git-clone`
+
+**Inputs:**
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| source | no | `off` | off (the project's own number stands) | app-store-connect (the next number after the highest uploaded for the app's current version; 1 when none) | given (build_number as it is) |
+| build_number | no | `$CIBUILD_BUILD_NUMBER` | given: the build number to use (up to three whole numbers joined by dots, or one $VARIABLE) |
+| project_path | no | - | app-store-connect: path to the .xcodeproj or .xcworkspace whose build settings hold the app's bundle id and version |
+| scheme | no | - | app-store-connect: the scheme whose app target is read |
+| configuration | no | `Release` | app-store-connect: build configuration to read the build settings of |
+| api_key_id | no | - | app-store-connect: App Store Connect API key ID; defaults to $APPLE_API_KEY_ID |
+| api_issuer | no | - | app-store-connect: API key issuer UUID; defaults to $APPLE_API_ISSUER_ID |
+| api_key_path | no | - | app-store-connect: base64-encoded (or PEM) .p8 key content; defaults to $APPLE_API_KEY_PATH |
+
+**Outputs:** `CIBUILD_ARCHIVE_BUILD_NUMBER`
+
+**Example:**
+```yaml
+- ios-build-number@1.0.0:
+    inputs:
+      source: app-store-connect
+      project_path: MyApp.xcworkspace
+      scheme: MyApp
+- ios-build-number@1.0.0:
+    inputs:
+      source: given
+      build_number: "$CIBUILD_BUILD_NUMBER"
+```
+
+---
+### ios-resign@1.0.0
+**Platform:** iOS
+
+> Signs a finished ipa again with another certificate and other provisioning profiles, without building the app again (for example to add a tester's phone to an ad hoc build). The app and every nested target in it (app extensions, a watch app, an App Clip, frameworks and libraries) are signed again, innermost first, and the entitlements follow the new profiles. The new ipa is written to the deploy folder, where artifacts are collected.
+
+**Agent Notes:** Run certificate-installer first: it installs the certificate and the profiles this step signs with. Give one appId=ProfileName line for the app and one for each nested app target (provisioning_profiles; read from IOS_SIGNING_PROFILE_LINES when left out); each profile is found among the installed ones by name. The certificate is signing_identity, or else the installed one of the profiles' team: Development when the app's profile allows debugging, Distribution otherwise (CIBUILD_KEYCHAIN_PATH is searched when set). Every app target is checked before anything is signed, and the step stops naming the target when its bundle id has no line, the named profile is not installed, is for another app id or has expired, or the target uses an entitlement (or an app group, iCloud container or other listed value) the new profile does not allow. The new entitlements are the profile's, with wildcards settled from the app's own values moved to the new team. The app id and version are never changed. The new ipa's path is published as CIBUILD_RESIGNED_IPA_PATH; ipa_path defaults to the CIBUILD_IPA_PATH xcode-archive publishes.
+
+**Requires:** commands: `codesign`, `security`, `unzip`, `zip` | steps: `certificate-installer`
+
+**Inputs:**
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| ipa_path | no | `$CIBUILD_IPA_PATH` | The ipa to sign again |
+| provisioning_profiles | no | - | 'appId=ProfileName' lines, one for the app and one for each nested app target (extensions, watch app); the profiles must be installed (certificate-installer). Defaults to $IOS_SIGNING_PROFILE_LINES |
+| signing_identity | no | - | Certificate to sign with (its name or SHA-1); default the installed certificate of the profiles' team, Development for a profile that allows debugging, Distribution otherwise |
+| output_name | no | - | Name of the new ipa, without .ipa; default '<name of the ipa>-resigned'. Written to the deploy folder |
+
+**Outputs:** `CIBUILD_RESIGNED_IPA_PATH`
+
+**Example:**
+```yaml
+- certificate-installer@1.1.0:
+    inputs:
+      certificate_base64: "$IOS_SIGNING_CERTIFICATE_BASE64"
+      certificate_passphrase: "$IOS_SIGNING_CERTIFICATE_PASSWORD"
+      provisioning_profiles_base64: "$IOS_SIGNING_PROFILES_BASE64"
+- ios-resign@1.0.0:
+    inputs:
+      ipa_path: build/MyApp.ipa
+      provisioning_profiles: |
+        com.example.myapp=MyApp Ad Hoc
+        com.example.myapp.widget=MyApp Widget Ad Hoc
+      output_name: MyApp-testers
+```
+
+---
 ### ota-install@1.0.0
 **Platform:** iOS
 
-> Generates a manifest.plist and an optional QR code for over-the-air (OTA) iOS app installation via the itms-services:// protocol. The IPA and manifest must be hosted at user-provided HTTPS URLs.
+> Generates a manifest.plist and prints the install link for over-the-air (OTA) iOS app installation via the itms-services:// protocol. The IPA and manifest must be hosted at user-provided HTTPS URLs.
 
-**Agent Notes:** Generates manifest.plist and QR code for OTA distribution via itms-services://. The IPA and manifest must be hosted at user-provided HTTPS URLs. Use after xcode-archive. Optionally renders a QR code in the terminal if qrencode is installed. The generated manifest.plist references the ipa_url so the device can download and install the build directly.
+**Agent Notes:** Generates manifest.plist and prints the install link for OTA distribution via itms-services://. The IPA and manifest must be hosted at user-provided HTTPS URLs. Use after xcode-archive. Optionally renders a QR code in the terminal if qrencode is installed, drawn on the build machine; the install link is never sent to an outside service. The generated manifest.plist references the ipa_url so the device can download and install the build directly. The QR image output is kept for compatibility and is always empty.
 
 **Requires:** steps: `xcode-archive`
 
@@ -844,7 +922,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | bundle_version | yes | - | CFBundleShortVersionString of the app (e.g. 1.0.0) |
 | title | yes | - | Display title shown during OTA installation |
 | ipa_path | no | - | Local path to the IPA file (used for metadata extraction) |
-| output_dir | no | `.ci/artifacts` | Directory where manifest.plist and QR code image are written |
+| output_dir | no | `.ci/artifacts` | Directory where manifest.plist is written |
 
 **Outputs:** `CIBUILD_PUBLIC_INSTALL_PAGE_QR_CODE_IMAGE_URL`
 
@@ -977,12 +1055,12 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 ```
 
 ---
-### xcode-archive@1.0.0
+### xcode-archive@1.1.0
 **Platform:** iOS
 
 > Runs the full xcodebuild archive and export flow, producing a signed IPA, an xcarchive, and dSYM files. Handles ExportOptions.plist generation, code-signing configuration, and bitcode settings automatically.
 
-**Agent Notes:** Full archive+export flow. Use after git-clone and dependency installation steps (cocoapods-install, spm-resolve, etc.). For App Store distribution, set distribution_method to app-store. The step auto-generates ExportOptions.plist unless export_options_plist_content is provided explicitly. Follow with app-store-deploy for App Store / TestFlight uploads, or ota-install for ad-hoc OTA distribution.
+**Agent Notes:** Full archive+export flow. Use after git-clone and dependency installation steps (cocoapods-install, spm-resolve, etc.). For App Store distribution, set distribution_method to app-store. The step auto-generates ExportOptions.plist unless export_options_plist_content is provided explicitly. Follow with app-store-deploy for App Store / TestFlight uploads, or ota-install for ad-hoc OTA distribution. To sign with a certificate and profiles instead of an API key (the only route for an enterprise account), run certificate-installer first and set automatic_code_signing to installed-files: every app and app extension target is signed manually with the profile named for its bundle id in provisioning_profiles, whatever signing style the project itself uses, and Swift package and other non-app targets are handed no profile. An app target with no profile line stops the step naming the target. team_id, provisioning_profiles and distribution_method are read from IOS_SIGNING_TEAM_ID, IOS_SIGNING_PROFILE_LINES and IOS_SIGNING_EXPORT_KIND when left out. automatic_code_signing apple-id is refused. A build number set by an earlier ios-build-number step (CIBUILD_ARCHIVE_BUILD_NUMBER) is handed to Xcode as the CURRENT_PROJECT_VERSION build setting; no project file is edited. Without one the project's own build number stands.
 
 **Requires:** commands: `xcodebuild` | steps: `git-clone`
 
@@ -992,16 +1070,18 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | project_path | yes | - | Path to the .xcodeproj or .xcworkspace file |
 | scheme | yes | - | Xcode scheme to archive |
 | configuration | no | `Release` | Build configuration (e.g. Debug, Release) |
-| distribution_method | no | `development` | Export distribution method (development, ad-hoc, app-store, enterprise) |
+| distribution_method | no | `development` | Export distribution method: development, ad-hoc, app-store, enterprise, or the current names debugging, release-testing, app-store-connect. Xcode is always sent the current name. Read from $IOS_SIGNING_EXPORT_KIND when left out. |
 | perform_clean_action | no | `no` | Whether to run xcodebuild clean before archiving |
-| automatic_code_signing | no | `off` | Enable or disable automatic code signing (on/off) |
+| automatic_code_signing | no | `off` | Code signing method: off (unsigned archive, no IPA), api-key (an App Store Connect API key), or installed-files (a certificate and one profile per app id installed before this step; every app target is signed manually whatever the project sets, no API key). apple-id is not supported. |
+| team_id | no | - | Apple team id; read from $IOS_SIGNING_TEAM_ID, else $APPLE_TEAM_ID, when left out |
+| signing_identity | no | - | installed-files: the certificate to sign with (its name or SHA-1); when left out, the installed certificate of the team that fits distribution_method (Development for development, Distribution otherwise) |
 | compile_bitcode | no | `yes` | Whether to compile bitcode (yes/no) |
 | upload_bitcode | no | `yes` | Whether to include bitcode in the exported archive (yes/no) |
 | xcconfig_content | no | `COMPILER_INDEX_STORE_ENABLE = NO` | Extra xcconfig settings applied during archive |
 | xcodebuild_options | no | - | Additional flags passed directly to xcodebuild |
 | export_options_plist_content | no | - | Custom ExportOptions.plist XML content; overrides auto-generation |
-| signing_style | no | `automatic` | Signing style for auto-generated ExportOptions.plist: automatic | manual. Ignored when export_options_plist_content is provided. |
-| provisioning_profiles | no | - | Newline-separated 'bundleId=ProfileName' pairs. Required when signing_style=manual. Reads APPLE_TEAM_ID from env at runtime. |
+| signing_style | no | `automatic` | Signing style for auto-generated ExportOptions.plist with api-key: automatic | manual (installed-files is always manual). Ignored when export_options_plist_content is provided. |
+| provisioning_profiles | no | - | Newline-separated 'appId=ProfileName' lines, one per app and app extension target. Needed for installed-files (read from $IOS_SIGNING_PROFILE_LINES when left out) and for signing_style manual (which reads APPLE_TEAM_ID at run time). |
 | output_dir | no | `build/ipa` | Directory where the IPA, xcarchive, and dSYM are written |
 | artifact_name | no | - | Custom base name for the exported artifacts |
 
@@ -1009,12 +1089,23 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 **Example:**
 ```yaml
-- xcode-archive@1.0.0:
+- certificate-installer@1.1.0: {}
+- xcode-archive@1.1.0:
+    inputs:
+      project_path: MyApp.xcworkspace
+      scheme: MyApp
+      distribution_method: enterprise
+      automatic_code_signing: installed-files
+      team_id: ABCDE12345
+      provisioning_profiles: |
+        com.example.app=MyApp Distribution
+        com.example.app.widget=MyApp Widget Distribution
+- xcode-archive@1.1.0:
     inputs:
       project_path: MyApp.xcworkspace
       scheme: MyApp
       distribution_method: app-store
-      automatic_code_signing: "on"
+      automatic_code_signing: api-key
       output_dir: build/ipa
 ```
 
