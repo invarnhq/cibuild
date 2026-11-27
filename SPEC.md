@@ -290,7 +290,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 > Sets up an SSH key for git authentication. Reads the private key from the SSH_RSA_PRIVATE_KEY environment variable, writes it to disk, and configures the SSH client for common git hosting providers. Skipped in local mode.
 
-**Agent Notes:** Sets up SSH key for git authentication. Reads SSH_RSA_PRIVATE_KEY env var, writes to ~/.ssh/, configures SSH client for github.com, gitlab.com, bitbucket.org. Skipped automatically in local mode. Use before git-clone if repo requires SSH auth.
+**Agent Notes:** Sets up SSH key for git authentication. Reads SSH_RSA_PRIVATE_KEY env var, writes to ~/.ssh/, configures SSH client for github.com, gitlab.com, bitbucket.org. ~ is the user's real home ($CIBUILD_USER_HOME when set, which ssh reads even when $HOME is a scratch folder); the ssh config is also written under $HOME when that differs. Skipped automatically in local mode. Use before git-clone if repo requires SSH auth.
 
 **Requires:** commands: `ssh-agent`, `ssh-add`
 
@@ -383,7 +383,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 > Runs a fastlane lane with Gemfile/Bundler detection. Automatically uses bundle exec when a Gemfile with the fastlane gem is detected. Optionally updates the fastlane gem before execution.
 
-**Agent Notes:** Use after git-clone and any dependency installation steps. The lane input is required. If your Fastfile is not in the repo root, set work_dir to the parent directory of the fastlane directory.
+**Agent Notes:** Use after git-clone and any dependency installation steps. The lane input is required. If your Fastfile is not in the repo root, set work_dir to the parent directory of the fastlane directory. Provisioning profiles fastlane installs (match, sigh) land where xcodebuild reads them, even when $HOME is a scratch folder ($CIBUILD_USER_HOME names the real home).
 
 **Requires:** steps: `git-clone`
 
@@ -604,7 +604,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 
 > Executes an arbitrary script using the specified runner. Supports bash, python, ruby, node, or any interpreter available on the system.
 
-**Agent Notes:** Execute arbitrary bash/python/ruby/node scripts. Use for custom build logic not covered by other steps. Set runner_bin to python/ruby/node for non-bash scripts.
+**Agent Notes:** Execute arbitrary bash/python/ruby/node scripts. Use for custom build logic not covered by other steps. Set runner_bin to python/ruby/node for non-bash scripts. A bash script that installs a provisioning profile under $HOME/Library installs it where xcodebuild reads it, even when $HOME is a scratch folder ($CIBUILD_USER_HOME names the real home).
 
 **Inputs:**
 | Name | Required | Default | Description |
