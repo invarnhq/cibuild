@@ -735,6 +735,7 @@ Use `destination: "auto"` in curated templates that need to survive Apple's devi
 | provisioning_profile_url | no | - | Provisioning profile file(s), pipe-separated: a link, a file:// path or a plain local path; read from $CIBUILD_PROVISION_URL when left out |
 | keychain_path | no | - | Keychain to install into; when left out, a new temporary keychain |
 | keychain_password | no | - | Keychain password; read from $CIBUILD_KEYCHAIN_PASSWORD when left out, else a random one |
+| note | no | - | Lines printed first in the step's log, as given (for example what was made for this build); read from $CIBUILD_SIGNING_NOTE when left out |
 | verbose | no | `false` | Enable verbose logging |
 
 **Outputs:** `CIBUILD_KEYCHAIN_PATH`
